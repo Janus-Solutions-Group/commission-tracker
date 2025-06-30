@@ -1,0 +1,48 @@
+{% set pagination_obj = projects if projects is defined else employees if employees is defined else project_staff if project_staff is defined else hours %}
+{% if pagination_obj and pagination_obj.pages > 1 %}
+<nav aria-label="Page navigation">
+    <ul class="pagination justify-content-center">
+        {% if pagination_obj.has_prev %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for(request.endpoint, page=pagination_obj.prev_num, **request.args) }}">
+                    <i data-feather="chevron-left"></i> Previous
+                </a>
+            </li>
+        {% endif %}
+
+        {% for page_num in pagination_obj.iter_pages() %}
+            {% if page_num %}
+                {% if page_num != pagination_obj.page %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for(request.endpoint, page=page_num, **request.args) }}">
+                            {{ page_num }}
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ page_num }}</span>
+                    </li>
+                {% endif %}
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                </li>
+            {% endif %}
+        {% endfor %}
+
+        {% if pagination_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for(request.endpoint, page=pagination_obj.next_num, **request.args) }}">
+                    Next <i data-feather="chevron-right"></i>
+                </a>
+            </li>
+        {% endif %}
+    </ul>
+</nav>
+
+<div class="text-center text-muted">
+    Showing {{ pagination_obj.per_page * (pagination_obj.page - 1) + 1 }} to 
+    {{ pagination_obj.per_page * pagination_obj.page if pagination_obj.page < pagination_obj.pages else pagination_obj.total }} 
+    of {{ pagination_obj.total }} entries
+</div>
+{% endif %}

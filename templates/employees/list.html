@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Employees - Commission Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>
+            <i data-feather="users"></i>
+            Employees
+        </h1>
+        <p class="text-muted">Manage your team members and their commission settings</p>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('employees_new') }}" class="btn btn-primary">
+            <i data-feather="user-plus"></i> New Employee
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if employees.items %}
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Role</th>
+                            <th>Hourly Rate</th>
+                            <th>Commission %</th>
+                            <th>Total Hours</th>
+                            <th>Total Commission</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for employee in employees.items %}
+                        <tr>
+                            <td>
+                                <strong>{{ employee.name }}</strong>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ employee.role }}</span>
+                            </td>
+                            <td>${{ "%.2f"|format(employee.hourly_rate) }}</td>
+                            <td>{{ "%.1f"|format(employee.commission_percentage) }}%</td>
+                            <td>{{ "%.2f"|format(employee.total_hours_worked) }}</td>
+                            <td>
+                                <strong class="text-success">${{ "%.2f"|format(employee.total_commission) }}</strong>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('employees_edit', id=employee.id) }}" class="btn btn-outline-secondary">
+                                        <i data-feather="edit-2"></i>
+                                    </a>
+                                    <form method="POST" action="{{ url_for('employees_delete', id=employee.id) }}" class="d-inline" 
+                                          onsubmit="return confirm('Are you sure you want to delete this employee?')">
+                                        <button type="submit" class="btn btn-outline-danger">
+                                            <i data-feather="trash-2"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            {% include 'components/pagination.html' %}
+        {% else %}
+            <div class="text-center py-5">
+                <i data-feather="users" style="width: 64px; height: 64px;" class="text-muted mb-3"></i>
+                <h4 class="text-muted">No employees yet</h4>
+                <p class="text-muted">Start by adding your first team member.</p>
+                <a href="{{ url_for('employees_new') }}" class="btn btn-primary">
+                    <i data-feather="user-plus"></i> Add Employee
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

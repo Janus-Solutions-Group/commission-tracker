@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Hours Entries - Commission Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>
+            <i data-feather="clock"></i>
+            Hours Entries
+        </h1>
+        <p class="text-muted">Track time entries and monitor billing efficiency</p>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('hours_new') }}" class="btn btn-primary">
+            <i data-feather="plus"></i> New Entry
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if hours.items %}
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Employee</th>
+                            <th>Project</th>
+                            <th>Hours Worked</th>
+                            <th>Hours Billed</th>
+                            <th>Efficiency</th>
+                            <th>Commission</th>
+                            <th>Revenue</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in hours.items %}
+                        <tr>
+                            <td>{{ entry.date.strftime('%Y-%m-%d') }}</td>
+                            <td>
+                                <strong>{{ entry.employee.name }}</strong>
+                                <br>
+                                <small class="text-muted">{{ entry.employee.role }}</small>
+                            </td>
+                            <td>
+                                {{ entry.project.name }}
+                                <br>
+                                <small class="text-muted">{{ entry.project.client }}</small>
+                            </td>
+                            <td>{{ "%.2f"|format(entry.hours_worked) }}</td>
+                            <td>{{ "%.2f"|format(entry.hours_billed) }}</td>
+                            <td>
+                                {% set efficiency = (entry.hours_billed / entry.hours_worked * 100) if entry.hours_worked > 0 else 0 %}
+                                <span class="badge {% if efficiency >= 90 %}bg-success{% elif efficiency >= 70 %}bg-warning{% else %}bg-danger{% endif %}">
+                                    {{ "%.1f"|format(efficiency) }}%
+                                </span>
+                            </td>
+                            <td>
+                                <strong class="text-success">${{ "%.2f"|format(entry.commission_earned) }}</strong>
+                            </td>
+                            <td>${{ "%.2f"|format(entry.revenue_generated) }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('hours_edit', id=entry.id) }}" class="btn btn-outline-secondary">
+                                        <i data-feather="edit-2"></i>
+                                    </a>
+                                    <form method="POST" action="{{ url_for('hours_delete', id=entry.id) }}" class="d-inline" 
+                                          onsubmit="return confirm('Are you sure you want to delete this hours entry?')">
+                                        <button type="submit" class="btn btn-outline-danger">
+                                            <i data-feather="trash-2"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            {% include 'components/pagination.html' %}
+        {% else %}
+            <div class="text-center py-5">
+                <i data-feather="clock" style="width: 64px; height: 64px;" class="text-muted mb-3"></i>
+                <h4 class="text-muted">No hours entries yet</h4>
+                <p class="text-muted">Start by logging your first hours entry.</p>
+                <a href="{{ url_for('hours_new') }}" class="btn btn-primary">
+                    <i data-feather="plus"></i> Log Hours
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics Dashboard - Commission Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>
+            <i data-feather="bar-chart-2"></i>
+            Analytics Dashboard
+        </h1>
+        <p class="text-muted">Detailed commission calculations and performance metrics</p>
+    </div>
+</div>
+
+<!-- Employee Performance -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i data-feather="users"></i>
+                    Employee Performance
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if employee_stats %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Role</th>
+                                    <th>Rate</th>
+                                    <th>Commission %</th>
+                                    <th>Hours Worked</th>
+                                    <th>Hours Billed</th>
+                                    <th>Efficiency</th>
+                                    <th>Total Revenue</th>
+                                    <th>Total Commission</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for employee, worked, billed, commission, revenue in employee_stats %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ employee.name }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ employee.role }}</span>
+                                    </td>
+                                    <td>${{ "%.2f"|format(employee.hourly_rate) }}</td>
+                                    <td>{{ "%.1f"|format(employee.commission_percentage) }}%</td>
+                                    <td>{{ "%.2f"|format(worked or 0) }}</td>
+                                    <td>{{ "%.2f"|format(billed or 0) }}</td>
+                                    <td>
+                                        {% set efficiency = ((billed or 0) / (worked or 1) * 100) if worked else 0 %}
+                                        <span class="badge {% if efficiency >= 90 %}bg-success{% elif efficiency >= 70 %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ "%.1f"|format(efficiency) }}%
+                                        </span>
+                                    </td>
+                                    <td>${{ "%.2f"|format(revenue or 0) }}</td>
+                                    <td>
+                                        <strong class="text-success">${{ "%.2f"|format(commission or 0) }}</strong>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-dark">
+                                <tr>
+                                    <th colspan="4">Totals</th>
+                                    <th>{{ "%.2f"|format(employee_stats|sum(attribute=1) or 0) }}</th>
+                                    <th>{{ "%.2f"|format(employee_stats|sum(attribute=2) or 0) }}</th>
+                                    <th>
+                                        {% set total_worked = employee_stats|sum(attribute=1) or 0 %}
+                                        {% set total_billed = employee_stats|sum(attribute=2) or 0 %}
+                                        {% set total_efficiency = (total_billed / total_worked * 100) if total_worked > 0 else 0 %}
+                                        <span class="badge {% if total_efficiency >= 90 %}bg-success{% elif total_efficiency >= 70 %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ "%.1f"|format(total_efficiency) }}%
+                                        </span>
+                                    </th>
+                                    <th>${{ "%.2f"|format(employee_stats|sum(attribute=4) or 0) }}</th>
+                                    <th class="text-success">
+                                        <strong>${{ "%.2f"|format(employee_stats|sum(attribute=3) or 0) }}</strong>
+                                    </th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i data-feather="users" style="width: 48px; height: 48px;" class="text-muted mb-3"></i>
+                        <h5 class="text-muted">No employee data available</h5>
+                        <p class="text-muted">Add employees and hours entries to see performance metrics.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Project Performance -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i data-feather="folder"></i>
+                    Project Performance
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if project_stats %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Project</th>
+                                    <th>Client</th>
+                                    <th>Status</th>
+                                    <th>Hours Worked</th>
+                                    <th>Hours Billed</th>
+                                    <th>Efficiency</th>
+                                    <th>Total Revenue</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for project, worked, billed, revenue in project_stats %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ project.name }}</strong>
+                                    </td>
+                                    <td>{{ project.client }}</td>
+                                    <td>
+                                        {% if project.end_date %}
+                                            <span class="badge bg-secondary">Completed</span>
+                                        {% else %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ "%.2f"|format(worked or 0) }}</td>
+                                    <td>{{ "%.2f"|format(billed or 0) }}</td>
+                                    <td>
+                                        {% set efficiency = ((billed or 0) / (worked or 1) * 100) if worked else 0 %}
+                                        <span class="badge {% if efficiency >= 90 %}bg-success{% elif efficiency >= 70 %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ "%.1f"|format(efficiency) }}%
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <strong>${{ "%.2f"|format(revenue or 0) }}</strong>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-dark">
+                                <tr>
+                                    <th colspan="3">Totals</th>
+                                    <th>{{ "%.2f"|format(project_stats|sum(attribute=1) or 0) }}</th>
+                                    <th>{{ "%.2f"|format(project_stats|sum(attribute=2) or 0) }}</th>
+                                    <th>
+                                        {% set total_worked = project_stats|sum(attribute=1) or 0 %}
+                                        {% set total_billed = project_stats|sum(attribute=2) or 0 %}
+                                        {% set total_efficiency = (total_billed / total_worked * 100) if total_worked > 0 else 0 %}
+                                        <span class="badge {% if total_efficiency >= 90 %}bg-success{% elif total_efficiency >= 70 %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ "%.1f"|format(total_efficiency) }}%
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <strong>${{ "%.2f"|format(project_stats|sum(attribute=3) or 0) }}</strong>
+                                    </th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i data-feather="folder" style="width: 48px; height: 48px;" class="text-muted mb-3"></i>
+                        <h5 class="text-muted">No project data available</h5>
+                        <p class="text-muted">Add projects and hours entries to see project performance.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

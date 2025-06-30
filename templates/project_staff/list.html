@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Project Assignments - Commission Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>
+            <i data-feather="user-plus"></i>
+            Project Assignments
+        </h1>
+        <p class="text-muted">Manage employee assignments to projects</p>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('project_staff_new') }}" class="btn btn-primary">
+            <i data-feather="plus"></i> New Assignment
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if project_staff.items %}
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Employee Role</th>
+                            <th>Project</th>
+                            <th>Role on Project</th>
+                            <th>Client</th>
+                            <th>Assigned Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for assignment in project_staff.items %}
+                        <tr>
+                            <td>
+                                <strong>{{ assignment.employee.name }}</strong>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ assignment.employee.role }}</span>
+                            </td>
+                            <td>{{ assignment.project.name }}</td>
+                            <td>
+                                <span class="badge bg-primary">{{ assignment.role_on_project }}</span>
+                            </td>
+                            <td>{{ assignment.project.client }}</td>
+                            <td>{{ assignment.created_at.strftime('%Y-%m-%d') }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('project_staff_edit', id=assignment.id) }}" class="btn btn-outline-secondary">
+                                        <i data-feather="edit-2"></i>
+                                    </a>
+                                    <form method="POST" action="{{ url_for('project_staff_delete', id=assignment.id) }}" class="d-inline" 
+                                          onsubmit="return confirm('Are you sure you want to remove this assignment?')">
+                                        <button type="submit" class="btn btn-outline-danger">
+                                            <i data-feather="trash-2"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            {% include 'components/pagination.html' %}
+        {% else %}
+            <div class="text-center py-5">
+                <i data-feather="user-plus" style="width: 64px; height: 64px;" class="text-muted mb-3"></i>
+                <h4 class="text-muted">No assignments yet</h4>
+                <p class="text-muted">Start by assigning employees to projects.</p>
+                <a href="{{ url_for('project_staff_new') }}" class="btn btn-primary">
+                    <i data-feather="plus"></i> Create Assignment
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

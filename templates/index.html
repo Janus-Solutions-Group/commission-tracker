@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Commission Tracker{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1 class="display-4">
+            <i data-feather="trending-up"></i>
+            Dashboard
+        </h1>
+        <p class="lead text-muted">Overview of projects, employees, and commission tracking</p>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-5">
+    <div class="col-md-3 mb-3">
+        <div class="card bg-primary">
+            <div class="card-body text-center">
+                <i data-feather="folder" class="mb-2" style="width: 48px; height: 48px;"></i>
+                <h3 class="card-title">{{ total_projects }}</h3>
+                <p class="card-text">Total Projects</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card bg-info">
+            <div class="card-body text-center">
+                <i data-feather="users" class="mb-2" style="width: 48px; height: 48px;"></i>
+                <h3 class="card-title">{{ total_employees }}</h3>
+                <p class="card-text">Total Employees</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card bg-success">
+            <div class="card-body text-center">
+                <i data-feather="dollar-sign" class="mb-2" style="width: 48px; height: 48px;"></i>
+                <h3 class="card-title">${{ "%.2f"|format(total_commission) }}</h3>
+                <p class="card-text">Total Commission</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card bg-warning">
+            <div class="card-body text-center">
+                <i data-feather="trending-up" class="mb-2" style="width: 48px; height: 48px;"></i>
+                <h3 class="card-title">${{ "%.2f"|format(total_revenue) }}</h3>
+                <p class="card-text">Total Revenue</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Recent Hours Entries -->
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i data-feather="clock"></i>
+                    Recent Hours Entries
+                </h5>
+                <a href="{{ url_for('hours_new') }}" class="btn btn-sm btn-primary">
+                    <i data-feather="plus"></i> Add Entry
+                </a>
+            </div>
+            <div class="card-body">
+                {% if recent_entries %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Employee</th>
+                                    <th>Project</th>
+                                    <th>Hours Worked</th>
+                                    <th>Hours Billed</th>
+                                    <th>Commission</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry in recent_entries %}
+                                <tr>
+                                    <td>{{ entry.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ entry.employee.name }}</td>
+                                    <td>{{ entry.project.name }}</td>
+                                    <td>{{ "%.2f"|format(entry.hours_worked) }}</td>
+                                    <td>{{ "%.2f"|format(entry.hours_billed) }}</td>
+                                    <td>${{ "%.2f"|format(entry.commission_earned) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-center">
+                        <a href="{{ url_for('hours_list') }}" class="btn btn-outline-primary">View All Hours</a>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i data-feather="clock" style="width: 64px; height: 64px;" class="text-muted mb-3"></i>
+                        <h5 class="text-muted">No hours entries yet</h5>
+                        <p class="text-muted">Start by adding your first hours entry.</p>
+                        <a href="{{ url_for('hours_new') }}" class="btn btn-primary">
+                            <i data-feather="plus"></i> Add Hours Entry
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Performers -->
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i data-feather="award"></i>
+                    Top Performers
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if top_performers %}
+                    {% for employee, commission in top_performers %}
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h6 class="mb-0">{{ employee.name }}</h6>
+                            <small class="text-muted">{{ employee.role }}</small>
+                        </div>
+                        <div class="text-end">
+                            <strong>${{ "%.2f"|format(commission or 0) }}</strong>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-4">
+                        <i data-feather="users" style="width: 48px; height: 48px;" class="text-muted mb-3"></i>
+                        <p class="text-muted">No commission data available yet.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i data-feather="zap"></i>
+                    Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-2">
+                        <a href="{{ url_for('projects_new') }}" class="btn btn-outline-primary w-100">
+                            <i data-feather="folder-plus"></i> New Project
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <a href="{{ url_for('employees_new') }}" class="btn btn-outline-info w-100">
+                            <i data-feather="user-plus"></i> New Employee
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <a href="{{ url_for('project_staff_new') }}" class="btn btn-outline-warning w-100">
+                            <i data-feather="link"></i> Assign Staff
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <a href="{{ url_for('hours_new') }}" class="btn btn-outline-success w-100">
+                            <i data-feather="clock"></i> Log Hours
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

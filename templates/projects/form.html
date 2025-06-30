@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Commission Tracker{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title mb-0">
+                    <i data-feather="folder"></i>
+                    {{ title }}
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.name.label(class="form-label") }}
+                        {{ form.name(class="form-control" + (" is-invalid" if form.name.errors else "")) }}
+                        {% if form.name.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.name.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.client.label(class="form-label") }}
+                        {{ form.client(class="form-control" + (" is-invalid" if form.client.errors else "")) }}
+                        {% if form.client.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.client.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.start_date.label(class="form-label") }}
+                                {{ form.start_date(class="form-control" + (" is-invalid" if form.start_date.errors else "")) }}
+                                {% if form.start_date.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.start_date.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.end_date.label(class="form-label") }}
+                                {{ form.end_date(class="form-control" + (" is-invalid" if form.end_date.errors else "")) }}
+                                <div class="form-text">Leave empty if project is ongoing</div>
+                                {% if form.end_date.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.end_date.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('projects_list') }}" class="btn btn-secondary">
+                            <i data-feather="arrow-left"></i> Back to Projects
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i data-feather="save"></i> Save Project
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
