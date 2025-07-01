@@ -104,8 +104,23 @@ Commission Tracker is a Flask-based web application designed to manage projects,
 - Seed data script available for testing and demonstration
 
 ## Changelog
-- June 30, 2025. Initial setup
+- June 30, 2025. Initial setup with dark theme
+- July 1, 2025. Updated to modern light theme with sky blue accents and advanced styling
+
+## Recent Changes
+- **July 1, 2025**: Complete design overhaul implementing modern, fresh styling
+  - Switched from dark to light theme with sky blue color palette
+  - Added Inter font for improved typography
+  - Implemented glassmorphism effects and advanced CSS animations
+  - Enhanced cards with hover effects and gradient borders
+  - Added smooth animations with staggered timing
+  - Modernized statistics cards with floating icons and gradient text
+  - Improved button styling with elevation effects
+  - Enhanced table design with better spacing and hover states
+  - Added custom scrollbar styling
+  - Implemented responsive design patterns
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Design preferences: Modern, stunning, fresh design with light theme and sky blue accents.

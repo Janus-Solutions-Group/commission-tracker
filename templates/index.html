@@ -3,52 +3,42 @@
 {% block title %}Dashboard - Commission Tracker{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col">
-        <h1 class="display-4">
-            <i data-feather="trending-up"></i>
-            Dashboard
-        </h1>
-        <p class="lead text-muted">Overview of projects, employees, and commission tracking</p>
-    </div>
+<div class="dashboard-header animate-fade-in">
+    <h1 class="display-4">
+        <i data-feather="trending-up"></i>
+        Dashboard
+    </h1>
+    <p class="lead">Overview of projects, employees, and commission tracking</p>
 </div>
 
 <!-- Statistics Cards -->
 <div class="row mb-5">
-    <div class="col-md-3 mb-3">
-        <div class="card bg-primary">
-            <div class="card-body text-center">
-                <i data-feather="folder" class="mb-2" style="width: 48px; height: 48px;"></i>
-                <h3 class="card-title">{{ total_projects }}</h3>
-                <p class="card-text">Total Projects</p>
-            </div>
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="stats-card animate-fade-in">
+            <i data-feather="folder" class="stats-icon"></i>
+            <div class="stats-value">{{ total_projects }}</div>
+            <div class="stats-label">Total Projects</div>
         </div>
     </div>
-    <div class="col-md-3 mb-3">
-        <div class="card bg-info">
-            <div class="card-body text-center">
-                <i data-feather="users" class="mb-2" style="width: 48px; height: 48px;"></i>
-                <h3 class="card-title">{{ total_employees }}</h3>
-                <p class="card-text">Total Employees</p>
-            </div>
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="stats-card animate-fade-in" style="animation-delay: 0.1s;">
+            <i data-feather="users" class="stats-icon"></i>
+            <div class="stats-value">{{ total_employees }}</div>
+            <div class="stats-label">Total Employees</div>
         </div>
     </div>
-    <div class="col-md-3 mb-3">
-        <div class="card bg-success">
-            <div class="card-body text-center">
-                <i data-feather="dollar-sign" class="mb-2" style="width: 48px; height: 48px;"></i>
-                <h3 class="card-title">${{ "%.2f"|format(total_commission) }}</h3>
-                <p class="card-text">Total Commission</p>
-            </div>
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="stats-card animate-fade-in" style="animation-delay: 0.2s;">
+            <i data-feather="dollar-sign" class="stats-icon"></i>
+            <div class="stats-value">${{ "%.2f"|format(total_commission) }}</div>
+            <div class="stats-label">Total Commission</div>
         </div>
     </div>
-    <div class="col-md-3 mb-3">
-        <div class="card bg-warning">
-            <div class="card-body text-center">
-                <i data-feather="trending-up" class="mb-2" style="width: 48px; height: 48px;"></i>
-                <h3 class="card-title">${{ "%.2f"|format(total_revenue) }}</h3>
-                <p class="card-text">Total Revenue</p>
-            </div>
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="stats-card animate-fade-in" style="animation-delay: 0.3s;">
+            <i data-feather="trending-up" class="stats-icon"></i>
+            <div class="stats-value">${{ "%.2f"|format(total_revenue) }}</div>
+            <div class="stats-label">Total Revenue</div>
         </div>
     </div>
 </div>
@@ -56,13 +46,13 @@
 <div class="row">
     <!-- Recent Hours Entries -->
     <div class="col-lg-8 mb-4">
-        <div class="card">
+        <div class="card animate-fade-in" style="animation-delay: 0.4s;">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">
+                <h5 class="card-title">
                     <i data-feather="clock"></i>
                     Recent Hours Entries
                 </h5>
-                <a href="{{ url_for('hours_new') }}" class="btn btn-sm btn-primary">
+                <a href="{{ url_for('hours_new') }}" class="btn btn-primary">
                     <i data-feather="plus"></i> Add Entry
                 </a>
             </div>
@@ -113,9 +103,9 @@
 
     <!-- Top Performers -->
     <div class="col-lg-4 mb-4">
-        <div class="card">
+        <div class="card animate-fade-in" style="animation-delay: 0.5s;">
             <div class="card-header">
-                <h5 class="card-title mb-0">
+                <h5 class="card-title">
                     <i data-feather="award"></i>
                     Top Performers
                 </h5>
@@ -145,35 +135,39 @@
 </div>
 
 <!-- Quick Actions -->
-<div class="row">
+<div class="row animate-slide-in">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5 class="card-title mb-0">
+                <h5 class="card-title">
                     <i data-feather="zap"></i>
                     Quick Actions
                 </h5>
             </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-3 mb-2">
+            <div class="card-body quick-actions">
+                <div class="row g-3">
+                    <div class="col-lg-3 col-md-6">
                         <a href="{{ url_for('projects_new') }}" class="btn btn-outline-primary w-100">
-                            <i data-feather="folder-plus"></i> New Project
+                            <i data-feather="folder-plus"></i>
+                            New Project
                         </a>
                     </div>
-                    <div class="col-md-3 mb-2">
-                        <a href="{{ url_for('employees_new') }}" class="btn btn-outline-info w-100">
-                            <i data-feather="user-plus"></i> New Employee
+                    <div class="col-lg-3 col-md-6">
+                        <a href="{{ url_for('employees_new') }}" class="btn btn-outline-primary w-100">
+                            <i data-feather="user-plus"></i>
+                            New Employee
                         </a>
                     </div>
-                    <div class="col-md-3 mb-2">
-                        <a href="{{ url_for('project_staff_new') }}" class="btn btn-outline-warning w-100">
-                            <i data-feather="link"></i> Assign Staff
+                    <div class="col-lg-3 col-md-6">
+                        <a href="{{ url_for('project_staff_new') }}" class="btn btn-outline-primary w-100">
+                            <i data-feather="link"></i>
+                            Assign Staff
                         </a>
                     </div>
-                    <div class="col-md-3 mb-2">
-                        <a href="{{ url_for('hours_new') }}" class="btn btn-outline-success w-100">
-                            <i data-feather="clock"></i> Log Hours
+                    <div class="col-lg-3 col-md-6">
+                        <a href="{{ url_for('hours_new') }}" class="btn btn-outline-primary w-100">
+                            <i data-feather="clock"></i>
+                            Log Hours
                         </a>
                     </div>
                 </div>
