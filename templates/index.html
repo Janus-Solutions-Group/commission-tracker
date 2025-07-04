@@ -14,32 +14,40 @@
 <!-- Statistics Cards -->
 <div class="row mb-5">
     <div class="col-lg-3 col-md-6 mb-4">
-        <div class="stats-card animate-fade-in">
-            <i data-feather="folder" class="stats-icon"></i>
-            <div class="stats-value">{{ total_projects }}</div>
-            <div class="stats-label">Total Projects</div>
-        </div>
+        <a href="{{ url_for('projects_list') }}" class="text-decoration-none">
+            <div class="stats-card animate-fade-in">
+                <i data-feather="folder" class="stats-icon"></i>
+                <div class="stats-value">{{ total_projects }}</div>
+                <div class="stats-label">Total Projects</div>
+            </div>
+        </a>
     </div>
     <div class="col-lg-3 col-md-6 mb-4">
-        <div class="stats-card animate-fade-in" style="animation-delay: 0.1s;">
-            <i data-feather="users" class="stats-icon"></i>
-            <div class="stats-value">{{ total_employees }}</div>
-            <div class="stats-label">Total Employees</div>
-        </div>
+        <a href="{{ url_for('employees_list') }}" class="text-decoration-none">
+            <div class="stats-card animate-fade-in" style="animation-delay: 0.1s;">
+                <i data-feather="users" class="stats-icon"></i>
+                <div class="stats-value">{{ total_employees }}</div>
+                <div class="stats-label">Total Employees</div>
+            </div>
+        </a>
     </div>
     <div class="col-lg-3 col-md-6 mb-4">
-        <div class="stats-card animate-fade-in" style="animation-delay: 0.2s;">
-            <i data-feather="dollar-sign" class="stats-icon"></i>
-            <div class="stats-value">${{ "%.2f"|format(total_commission) }}</div>
-            <div class="stats-label">Total Commission</div>
-        </div>
+        <a href="{{ url_for('dashboard') }}" class="text-decoration-none">
+            <div class="stats-card animate-fade-in" style="animation-delay: 0.2s;">
+                <i data-feather="dollar-sign" class="stats-icon"></i>
+                <div class="stats-value">${{ "%.2f"|format(total_commission) }}</div>
+                <div class="stats-label">Total Commission</div>
+            </div>
+        </a>
     </div>
     <div class="col-lg-3 col-md-6 mb-4">
-        <div class="stats-card animate-fade-in" style="animation-delay: 0.3s;">
-            <i data-feather="trending-up" class="stats-icon"></i>
-            <div class="stats-value">${{ "%.2f"|format(total_revenue) }}</div>
-            <div class="stats-label">Total Revenue</div>
-        </div>
+        <a href="{{ url_for('dashboard') }}" class="text-decoration-none">
+            <div class="stats-card animate-fade-in" style="animation-delay: 0.3s;">
+                <i data-feather="trending-up" class="stats-icon"></i>
+                <div class="stats-value">${{ "%.2f"|format(total_revenue) }}</div>
+                <div class="stats-label">Total Revenue</div>
+            </div>
+        </a>
     </div>
 </div>
 

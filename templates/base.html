@@ -211,6 +211,24 @@
             font-size: 0.95rem;
         }
         
+        /* Clickable stats cards */
+        a .stats-card {
+            cursor: pointer;
+        }
+        
+        a .stats-card:hover {
+            transform: translateY(-12px) scale(1.05);
+        }
+        
+        a .stats-value,
+        a .stats-label {
+            transition: color 0.3s ease;
+        }
+        
+        a:hover .stats-value {
+            color: var(--primary);
+        }
+        
         /* Buttons */
         .btn {
             border-radius: var(--radius);
