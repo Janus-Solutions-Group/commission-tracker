@@ -245,6 +245,67 @@
             transform: translateY(-2px);
         }
         
+        /* Subtle table action buttons */
+        .table .btn {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.875rem;
+            font-weight: 400;
+            box-shadow: none;
+            border-radius: 6px;
+        }
+        
+        .table .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+            font-weight: 400;
+            box-shadow: none;
+            border-radius: 4px;
+        }
+        
+        .table .btn:hover {
+            transform: none;
+            box-shadow: 0 2px 8px rgba(44, 50, 242, 0.2);
+        }
+        
+        .table .btn-outline-primary {
+            border: 1px solid var(--border);
+            color: var(--text-light);
+            background: transparent;
+        }
+        
+        .table .btn-outline-primary:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(44, 50, 242, 0.05);
+            transform: none;
+        }
+        
+        .table .btn-outline-warning {
+            border: 1px solid var(--border);
+            color: var(--text-light);
+            background: transparent;
+        }
+        
+        .table .btn-outline-warning:hover {
+            border-color: #f59e0b;
+            color: #f59e0b;
+            background: rgba(245, 158, 11, 0.05);
+            transform: none;
+        }
+        
+        .table .btn-outline-danger {
+            border: 1px solid var(--border);
+            color: var(--text-light);
+            background: transparent;
+        }
+        
+        .table .btn-outline-danger:hover {
+            border-color: #dc2626;
+            color: #dc2626;
+            background: rgba(220, 38, 38, 0.05);
+            transform: none;
+        }
+        
         /* Tables */
         .table {
             border-radius: var(--radius);
