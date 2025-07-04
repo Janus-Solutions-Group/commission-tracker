@@ -123,4 +123,4 @@ Commission Tracker is a Flask-based web application designed to manage projects,
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
-Design preferences: Modern, stunning, fresh design with light theme and sky blue accents.
+Design preferences: Modern, stunning, fresh design with darker blue theme color (#2c32f2) - user specifically requested this blue color instead of the lighter theme.
