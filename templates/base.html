@@ -40,6 +40,9 @@
             color: var(--text);
             line-height: 1.6;
             overflow-x: hidden;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
         
         /* Glassmorphism effect */
@@ -401,12 +404,48 @@
             z-index: 1;
         }
         
+        /* Main content area */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .content-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Tables and forms full height */
+        .card {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .card-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .table-responsive {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
         /* Footer */
         footer {
             background: linear-gradient(135deg, var(--surface) 0%, var(--background-secondary) 100%);
             border-top: 1px solid var(--border);
             color: var(--text-light);
-            margin-top: 4rem;
+            margin-top: auto;
+        }
+        
+        footer a:hover {
+            color: var(--primary) !important;
+            transition: color 0.3s ease;
         }
         
         /* Quick actions */
@@ -505,24 +544,44 @@
     <main class="container mt-4">
         {% include 'components/flash_messages.html' %}
         
-        {% block content %}{% endblock %}
+        <div class="content-wrapper">
+            {% block content %}{% endblock %}
+        </div>
     </main>
 
-    <footer class="mt-5 py-4">
+    <footer class="py-5">
         <div class="container">
             <div class="row">
-                <div class="col-md-8 mx-auto text-center">
+                <!-- Column 1: Description -->
+                <div class="col-md-4 mb-4">
                     <h5 class="mb-3">Commission Tracker</h5>
-                    <p class="text-muted mb-3">
-                        A comprehensive project management and commission tracking solution designed to streamline employee time logging, project assignments, and commission calculations. Track billable hours, monitor project progress, and generate detailed analytics for performance-based compensation management across multiple clients and projects.
+                    <p class="text-muted">
+                        Professional project management and commission tracking solution for streamlined time logging, project assignments, and performance-based compensation analytics.
                     </p>
                 </div>
-            </div>
-            <div class="row mt-3">
-                <div class="col-12 text-center">
-                    <p class="text-muted mb-0 small">
-                        &copy; 2025 <a href="mailto:www.janussolutionsgroup.com" class="text-decoration-none" style="color: var(--primary);">Janus Solutions Group</a>. All rights reserved.
+                
+                <!-- Column 2: Quick Links -->
+                <div class="col-md-4 mb-4">
+                    <h6 class="mb-3">Quick Links</h6>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><a href="{{ url_for('projects_list') }}" class="text-decoration-none" style="color: var(--text-light);">Projects</a></li>
+                        <li class="mb-2"><a href="{{ url_for('employees_list') }}" class="text-decoration-none" style="color: var(--text-light);">Employees</a></li>
+                        <li class="mb-2"><a href="{{ url_for('project_staff_list') }}" class="text-decoration-none" style="color: var(--text-light);">Project Staff</a></li>
+                        <li class="mb-2"><a href="{{ url_for('hours_list') }}" class="text-decoration-none" style="color: var(--text-light);">Hours Entries</a></li>
+                        <li class="mb-2"><a href="{{ url_for('dashboard') }}" class="text-decoration-none" style="color: var(--text-light);">Dashboard</a></li>
+                    </ul>
+                </div>
+                
+                <!-- Column 3: Legal -->
+                <div class="col-md-4 mb-4">
+                    <h6 class="mb-3">Legal</h6>
+                    <p class="text-muted mb-2 small">
+                        &copy; 2025 <a href="mailto:www.janussolutionsgroup.com" class="text-decoration-none" style="color: var(--primary);">Janus Solutions Group</a>
                     </p>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><a href="{{ url_for('privacy_policy') }}" class="text-decoration-none small" style="color: var(--text-light);">Privacy Policy</a></li>
+                        <li class="mb-2"><a href="{{ url_for('terms_conditions') }}" class="text-decoration-none small" style="color: var(--text-light);">Terms & Conditions</a></li>
+                    </ul>
                 </div>
             </div>
         </div>

@@ -245,3 +245,11 @@ def not_found(error):
 def internal_error(error):
     db.session.rollback()
     return render_template('500.html'), 500
+
+@app.route('/privacy-policy')
+def privacy_policy():
+    return render_template('privacy_policy.html')
+
+@app.route('/terms-conditions')
+def terms_conditions():
+    return render_template('terms_conditions.html')
