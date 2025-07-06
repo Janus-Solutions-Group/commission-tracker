@@ -1,6 +1,40 @@
 from datetime import datetime
 from app import db
-from sqlalchemy import func
+from flask_dance.consumer.storage.sqla import OAuthConsumerMixin
+from flask_login import UserMixin
+from sqlalchemy import UniqueConstraint
+
+
+# User model for authentication
+class User(UserMixin, db.Model):
+    __tablename__ = 'users'
+    id = db.Column(db.String, primary_key=True)
+    email = db.Column(db.String, unique=True, nullable=True)
+    first_name = db.Column(db.String, nullable=True)
+    last_name = db.Column(db.String, nullable=True)
+    profile_image_url = db.Column(db.String, nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    projects = db.relationship('Project', backref='user', lazy=True, cascade='all, delete-orphan')
+    employees = db.relationship('Employee', backref='user', lazy=True, cascade='all, delete-orphan')
+
+
+# OAuth model for authentication
+class OAuth(OAuthConsumerMixin, db.Model):
+    user_id = db.Column(db.String, db.ForeignKey(User.id))
+    browser_session_key = db.Column(db.String, nullable=False)
+    user = db.relationship(User)
+
+    __table_args__ = (UniqueConstraint(
+        'user_id',
+        'browser_session_key',
+        'provider',
+        name='uq_user_browser_session_key_provider',
+    ),)
+
 
 class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -9,6 +43,7 @@ class Project(db.Model):
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.String, db.ForeignKey('users.id'), nullable=False)
     
     # Relationships
     project_staff = db.relationship('ProjectStaff', backref='project', lazy=True, cascade='all, delete-orphan')
@@ -39,6 +74,7 @@ class Employee(db.Model):
     hourly_rate = db.Column(db.Float, nullable=False)
     commission_percentage = db.Column(db.Float, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.String, db.ForeignKey('users.id'), nullable=False)
     
     # Relationships
     project_staff = db.relationship('ProjectStaff', backref='employee', lazy=True, cascade='all, delete-orphan')

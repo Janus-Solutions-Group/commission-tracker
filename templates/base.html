@@ -597,6 +597,7 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
+                {% if current_user.is_authenticated %}
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('index') }}">
@@ -624,6 +625,25 @@
                         </a>
                     </li>
                 </ul>
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            {% if current_user.profile_image_url %}
+                                <img src="{{ current_user.profile_image_url }}" alt="Profile" style="width: 24px; height: 24px; border-radius: 50%; margin-right: 8px; object-fit: cover;">
+                            {% else %}
+                                <i data-feather="user" style="width: 16px; height: 16px; margin-right: 8px;"></i>
+                            {% endif %}
+                            {{ current_user.first_name or current_user.email or 'User' }}
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('replit_auth.logout') }}">
+                                <i data-feather="log-out" style="width: 16px; height: 16px; margin-right: 8px;"></i>
+                                Sign Out
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+                {% endif %}
             </div>
         </div>
     </nav>
