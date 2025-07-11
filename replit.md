@@ -120,17 +120,6 @@ Commission Tracker is a Flask-based web application designed to manage projects,
   - Added custom scrollbar styling
   - Implemented responsive design patterns
 
-- **July 6, 2025**: Complete authentication system implementation
-  - Integrated Replit Authentication with OAuth2 and JWT
-  - Added user-specific data isolation for all features
-  - Implemented landing page for non-authenticated users
-  - Added sign-out functionality with user profile dropdown
-  - Created user-specific project, employee, and hours tracking
-  - Added User and OAuth models for secure session management
-  - Filtered all CRUD operations to show only user's data
-  - Updated navbar with authentication-based navigation
-  - Removed copyright from footer as requested
-
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
