@@ -42,27 +42,33 @@ def index():
 @app.route('/dashboard')
 def dashboard():
     """Detailed dashboard with commission calculations and analytics"""
+
     # Employee commission summary
     employee_stats = db.session.query(
         Employee,
-        func.sum(HoursEntry.hours_worked).label('total_worked'),
-        func.sum(HoursEntry.hours_billed).label('total_billed'),
-        func.sum(HoursEntry.hours_billed * Employee.hourly_rate * Employee.commission_percentage / 100).label('total_commission'),
-        func.sum(HoursEntry.hours_billed * Employee.hourly_rate).label('total_revenue')
+        func.coalesce(func.sum(HoursEntry.hours_worked), 0).label('total_worked'),
+        func.coalesce(func.sum(HoursEntry.hours_billed), 0).label('total_billed'),
+        func.coalesce(
+            func.sum(HoursEntry.hours_billed * Employee.hourly_rate * Employee.commission_percentage / 100), 0
+        ).label('total_commission'),
+        func.coalesce(
+            func.sum(HoursEntry.hours_billed * Employee.hourly_rate), 0
+        ).label('total_revenue')
     ).outerjoin(HoursEntry).group_by(Employee.id).all()
-    
+
     # Project summary
     project_stats = db.session.query(
         Project,
-        func.sum(HoursEntry.hours_worked).label('total_worked'),
-        func.sum(HoursEntry.hours_billed).label('total_billed'),
-        func.sum(HoursEntry.hours_billed * Employee.hourly_rate).label('total_revenue')
+        func.coalesce(func.sum(HoursEntry.hours_worked), 0).label('total_worked'),
+        func.coalesce(func.sum(HoursEntry.hours_billed), 0).label('total_billed'),
+        func.coalesce(
+            func.sum(HoursEntry.hours_billed * Employee.hourly_rate), 0
+        ).label('total_revenue')
     ).outerjoin(HoursEntry).outerjoin(Employee).group_by(Project.id).all()
-    
-    return render_template('dashboard.html',
-                         employee_stats=employee_stats,
-                         project_stats=project_stats)
 
+    return render_template('dashboard.html',
+                           employee_stats=employee_stats,
+                           project_stats=project_stats)
 # Projects routes
 @app.route('/projects')
 def projects_list():

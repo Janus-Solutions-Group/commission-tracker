@@ -54,8 +54,8 @@
         
         /* Navigation */
         .navbar {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
-            backdrop-filter: blur(20px);
+            background: '#fff';
+            /* backdrop-filter: blur(20px); */
             border: none;
             padding: 1rem 0;
             box-shadow: 0 8px 32px rgba(15, 23, 42, 0.1);
@@ -90,7 +90,7 @@
         }
         
         .navbar-nav .nav-link {
-            color: rgba(255, 255, 255, 0.9) !important;
+            color: var(--primary) !important;
             font-weight: 500;
             padding: 0.75rem 1.25rem !important;
             border-radius: var(--radius);
@@ -100,7 +100,7 @@
         }
         
         .navbar-nav .nav-link:hover {
-            color: white !important;
+            /* color: white !important; */
             background: rgba(255, 255, 255, 0.15);
             transform: translateY(-2px);
         }
@@ -590,8 +590,8 @@
     <nav class="navbar navbar-expand-lg">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('index') }}">
-                <i data-feather="dollar-sign"></i>
-                Commission Tracker
+                <img src="{{ url_for('static', filename='logo.png') }}" class="img-fluid rounded mb-1" style="height: 70px;" alt="Logo">
+                <!-- Commission Tracker -->
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -599,7 +599,7 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('index') }}">
+                        <a class="nav-link" href="{{ url_for('dashboard') }}">
                             <i data-feather="home"></i> Dashboard
                         </a>
                     </li>
