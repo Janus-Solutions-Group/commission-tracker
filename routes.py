@@ -1,35 +1,103 @@
 from flask import render_template, request, redirect, url_for, flash, jsonify
+from flask_login import login_user, logout_user, current_user, login_required
+from urllib.parse import urlparse
 from app import app, db
-from models import Project, Employee, ProjectStaff, HoursEntry
-from forms import ProjectForm, EmployeeForm, ProjectStaffForm, HoursEntryForm
+from models import Project, Employee, ProjectStaff, HoursEntry, User, Company
+from forms import ProjectForm, EmployeeForm, ProjectStaffForm, HoursEntryForm, SignupForm, LoginForm
 from utils import get_paginated_query
 from sqlalchemy import func, desc
 
+# Authentication routes
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    form = SignupForm()
+    if form.validate_on_submit():
+        # Check if username or email already exists
+        existing_user = User.query.filter(
+            (User.username == form.username.data) | (User.email == form.email.data)
+        ).first()
+        if existing_user:
+            flash('Username or email already exists', 'error')
+            return render_template('auth/signup.html', form=form)
+        
+        # Check if company already exists
+        company = Company.query.filter_by(name=form.company_name.data).first()
+        if not company:
+            company = Company(name=form.company_name.data)
+            db.session.add(company)
+            db.session.flush()  # To get company.id
+        
+        # Create user
+        user = User(
+            username=form.username.data,
+            email=form.email.data,
+            company_id=company.id,
+            is_owner=True  # First user of company becomes owner
+        )
+        user.set_password(form.password.data)
+        db.session.add(user)
+        db.session.commit()
+        
+        flash('Registration successful! Please log in.', 'success')
+        return redirect(url_for('login'))
+    
+    return render_template('auth/signup.html', form=form)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(username=form.username.data).first()
+        if user and user.check_password(form.password.data):
+            login_user(user, remember=form.remember_me.data)
+            next_page = request.args.get('next')
+            if not next_page or urlparse(next_page).netloc != '':
+                next_page = url_for('index')
+            return redirect(next_page)
+        flash('Invalid username or password', 'error')
+    
+    return render_template('auth/login.html', form=form)
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
 @app.route('/')
+@login_required
 def index():
     """Dashboard with overview statistics"""
-    # Get summary statistics
-    total_projects = Project.query.count()
-    total_employees = Employee.query.count()
+    # Get summary statistics for current user's company
+    total_projects = Project.query.filter_by(company_id=current_user.company_id).count()
+    total_employees = Employee.query.filter_by(company_id=current_user.company_id).count()
     
-    # Total commission
+    # Total commission for current company
     total_commission = db.session.query(
         func.sum(HoursEntry.hours_billed * Employee.hourly_rate * Employee.commission_percentage / 100)
-    ).join(Employee).scalar() or 0
+    ).join(Employee).join(Project).filter(Project.company_id == current_user.company_id).scalar() or 0
     
-    # Total revenue
+    # Total revenue for current company
     total_revenue = db.session.query(
         func.sum(HoursEntry.hours_billed * Employee.hourly_rate)
-    ).join(Employee).scalar() or 0
+    ).join(Employee).join(Project).filter(Project.company_id == current_user.company_id).scalar() or 0
     
-    # Recent hours entries
-    recent_entries = HoursEntry.query.order_by(desc(HoursEntry.created_at)).limit(5).all()
+    # Recent hours entries for current company
+    recent_entries = HoursEntry.query.join(Project).filter(
+        Project.company_id == current_user.company_id
+    ).order_by(desc(HoursEntry.created_at)).limit(5).all()
     
-    # Top performers by commission
+    # Top performers by commission for current company
     top_performers = db.session.query(
         Employee,
         func.sum(HoursEntry.hours_billed * Employee.hourly_rate * Employee.commission_percentage / 100).label('total_commission')
-    ).join(HoursEntry).group_by(Employee.id).order_by(desc('total_commission')).limit(5).all()
+    ).join(HoursEntry).filter(Employee.company_id == current_user.company_id).group_by(Employee.id).order_by(desc('total_commission')).limit(5).all()
     
     return render_template('index.html',
                          total_projects=total_projects,
@@ -40,10 +108,11 @@ def index():
                          top_performers=top_performers)
 
 @app.route('/dashboard')
+@login_required
 def dashboard():
     """Detailed dashboard with commission calculations and analytics"""
 
-    # Employee commission summary
+    # Employee commission summary for current company
     employee_stats = db.session.query(
         Employee,
         func.coalesce(func.sum(HoursEntry.hours_worked), 0).label('total_worked'),
@@ -54,9 +123,9 @@ def dashboard():
         func.coalesce(
             func.sum(HoursEntry.hours_billed * Employee.hourly_rate), 0
         ).label('total_revenue')
-    ).outerjoin(HoursEntry).group_by(Employee.id).all()
+    ).filter(Employee.company_id == current_user.company_id).outerjoin(HoursEntry).group_by(Employee.id).all()
 
-    # Project summary
+    # Project summary for current company
     project_stats = db.session.query(
         Project,
         func.coalesce(func.sum(HoursEntry.hours_worked), 0).label('total_worked'),
@@ -64,20 +133,25 @@ def dashboard():
         func.coalesce(
             func.sum(HoursEntry.hours_billed * Employee.hourly_rate), 0
         ).label('total_revenue')
-    ).outerjoin(HoursEntry).outerjoin(Employee).group_by(Project.id).all()
+    ).filter(Project.company_id == current_user.company_id).outerjoin(HoursEntry).outerjoin(Employee).group_by(Project.id).all()
 
     return render_template('dashboard.html',
                            employee_stats=employee_stats,
                            project_stats=project_stats)
 # Projects routes
 @app.route('/projects')
+@login_required
 def projects_list():
     page = request.args.get('page', 1, type=int)
     per_page = 10
-    projects = get_paginated_query(Project.query.order_by(Project.name), page, per_page)
+    projects = get_paginated_query(
+        Project.query.filter_by(company_id=current_user.company_id).order_by(Project.name), 
+        page, per_page
+    )
     return render_template('projects/list.html', projects=projects)
 
 @app.route('/projects/new', methods=['GET', 'POST'])
+@login_required
 def projects_new():
     form = ProjectForm()
     if form.validate_on_submit():
@@ -85,7 +159,9 @@ def projects_new():
             name=form.name.data,
             client=form.client.data,
             start_date=form.start_date.data,
-            end_date=form.end_date.data
+            end_date=form.end_date.data,
+            total_allocated_hours=form.total_allocated_hours.data,
+            company_id=current_user.company_id
         )
         db.session.add(project)
         db.session.commit()
@@ -94,8 +170,9 @@ def projects_new():
     return render_template('projects/form.html', form=form, title='New Project')
 
 @app.route('/projects/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def projects_edit(id):
-    project = Project.query.get_or_404(id)
+    project = Project.query.filter_by(id=id, company_id=current_user.company_id).first_or_404()
     form = ProjectForm(obj=project)
     if form.validate_on_submit():
         form.populate_obj(project)
@@ -105,22 +182,40 @@ def projects_edit(id):
     return render_template('projects/form.html', form=form, title='Edit Project', project=project)
 
 @app.route('/projects/<int:id>/delete', methods=['POST'])
+@login_required
 def projects_delete(id):
-    project = Project.query.get_or_404(id)
+    project = Project.query.filter_by(id=id, company_id=current_user.company_id).first_or_404()
     db.session.delete(project)
     db.session.commit()
     flash('Project deleted successfully!', 'success')
     return redirect(url_for('projects_list'))
 
+@app.route('/projects/<int:id>')
+@login_required
+def projects_detail(id):
+    project = Project.query.filter_by(id=id, company_id=current_user.company_id).first_or_404()
+    
+    # Get all hour entries for this project
+    hour_entries = HoursEntry.query.filter_by(project_id=project.id).order_by(
+        HoursEntry.date.desc(), HoursEntry.created_at.desc()
+    ).all()
+    
+    return render_template('projects/detail.html', project=project, hour_entries=hour_entries)
+
 # Employees routes
 @app.route('/employees')
+@login_required
 def employees_list():
     page = request.args.get('page', 1, type=int)
     per_page = 10
-    employees = get_paginated_query(Employee.query.order_by(Employee.name), page, per_page)
+    employees = get_paginated_query(
+        Employee.query.filter_by(company_id=current_user.company_id).order_by(Employee.name), 
+        page, per_page
+    )
     return render_template('employees/list.html', employees=employees)
 
 @app.route('/employees/new', methods=['GET', 'POST'])
+@login_required
 def employees_new():
     form = EmployeeForm()
     if form.validate_on_submit():
@@ -128,7 +223,8 @@ def employees_new():
             name=form.name.data,
             role=form.role.data,
             hourly_rate=form.hourly_rate.data,
-            commission_percentage=form.commission_percentage.data
+            commission_percentage=form.commission_percentage.data,
+            company_id=current_user.company_id
         )
         db.session.add(employee)
         db.session.commit()
@@ -137,8 +233,9 @@ def employees_new():
     return render_template('employees/form.html', form=form, title='New Employee')
 
 @app.route('/employees/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def employees_edit(id):
-    employee = Employee.query.get_or_404(id)
+    employee = Employee.query.filter_by(id=id, company_id=current_user.company_id).first_or_404()
     form = EmployeeForm(obj=employee)
     if form.validate_on_submit():
         form.populate_obj(employee)
@@ -148,8 +245,9 @@ def employees_edit(id):
     return render_template('employees/form.html', form=form, title='Edit Employee', employee=employee)
 
 @app.route('/employees/<int:id>/delete', methods=['POST'])
+@login_required
 def employees_delete(id):
-    employee = Employee.query.get_or_404(id)
+    employee = Employee.query.filter_by(id=id, company_id=current_user.company_id).first_or_404()
     db.session.delete(employee)
     db.session.commit()
     flash('Employee deleted successfully!', 'success')
@@ -157,13 +255,18 @@ def employees_delete(id):
 
 # Project Staff routes
 @app.route('/project-staff')
+@login_required
 def project_staff_list():
     page = request.args.get('page', 1, type=int)
     per_page = 10
-    project_staff = get_paginated_query(ProjectStaff.query.order_by(ProjectStaff.created_at.desc()), page, per_page)
+    project_staff = get_paginated_query(
+        ProjectStaff.query.join(Project).filter(Project.company_id == current_user.company_id).order_by(ProjectStaff.created_at.desc()), 
+        page, per_page
+    )
     return render_template('project_staff/list.html', project_staff=project_staff)
 
 @app.route('/project-staff/new', methods=['GET', 'POST'])
+@login_required
 def project_staff_new():
     form = ProjectStaffForm()
     if form.validate_on_submit():
@@ -179,8 +282,12 @@ def project_staff_new():
     return render_template('project_staff/form.html', form=form, title='Assign Employee to Project')
 
 @app.route('/project-staff/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def project_staff_edit(id):
-    project_staff = ProjectStaff.query.get_or_404(id)
+    project_staff = ProjectStaff.query.join(Project).filter(
+        ProjectStaff.id == id, 
+        Project.company_id == current_user.company_id
+    ).first_or_404()
     form = ProjectStaffForm(obj=project_staff)
     if form.validate_on_submit():
         form.populate_obj(project_staff)
@@ -190,8 +297,12 @@ def project_staff_edit(id):
     return render_template('project_staff/form.html', form=form, title='Edit Project Assignment', project_staff=project_staff)
 
 @app.route('/project-staff/<int:id>/delete', methods=['POST'])
+@login_required
 def project_staff_delete(id):
-    project_staff = ProjectStaff.query.get_or_404(id)
+    project_staff = ProjectStaff.query.join(Project).filter(
+        ProjectStaff.id == id, 
+        Project.company_id == current_user.company_id
+    ).first_or_404()
     db.session.delete(project_staff)
     db.session.commit()
     flash('Project assignment removed successfully!', 'success')
@@ -199,13 +310,18 @@ def project_staff_delete(id):
 
 # Hours Entry routes
 @app.route('/hours')
+@login_required
 def hours_list():
     page = request.args.get('page', 1, type=int)
     per_page = 10
-    hours = get_paginated_query(HoursEntry.query.order_by(HoursEntry.date.desc()), page, per_page)
+    hours = get_paginated_query(
+        HoursEntry.query.join(Project).filter(Project.company_id == current_user.company_id).order_by(HoursEntry.date.desc()), 
+        page, per_page
+    )
     return render_template('hours/list.html', hours=hours)
 
 @app.route('/hours/new', methods=['GET', 'POST'])
+@login_required
 def hours_new():
     form = HoursEntryForm()
     if form.validate_on_submit():
@@ -224,8 +340,12 @@ def hours_new():
     return render_template('hours/form.html', form=form, title='New Hours Entry')
 
 @app.route('/hours/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def hours_edit(id):
-    hours_entry = HoursEntry.query.get_or_404(id)
+    hours_entry = HoursEntry.query.join(Project).filter(
+        HoursEntry.id == id, 
+        Project.company_id == current_user.company_id
+    ).first_or_404()
     form = HoursEntryForm(obj=hours_entry)
     if form.validate_on_submit():
         form.populate_obj(hours_entry)
@@ -235,8 +355,12 @@ def hours_edit(id):
     return render_template('hours/form.html', form=form, title='Edit Hours Entry', hours_entry=hours_entry)
 
 @app.route('/hours/<int:id>/delete', methods=['POST'])
+@login_required
 def hours_delete(id):
-    hours_entry = HoursEntry.query.get_or_404(id)
+    hours_entry = HoursEntry.query.join(Project).filter(
+        HoursEntry.id == id, 
+        Project.company_id == current_user.company_id
+    ).first_or_404()
     db.session.delete(hours_entry)
     db.session.commit()
     flash('Hours entry deleted successfully!', 'success')

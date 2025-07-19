@@ -1,14 +1,27 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, FloatField, DateField, TextAreaField, SelectField, IntegerField
-from wtforms.validators import DataRequired, NumberRange, Length, ValidationError
-from models import Employee, Project, ProjectStaff
+from wtforms import StringField, FloatField, DateField, TextAreaField, SelectField, IntegerField, PasswordField, BooleanField
+from wtforms.validators import DataRequired, NumberRange, Length, ValidationError, Email, EqualTo
+from models import Employee, Project, ProjectStaff, User, Company
 from datetime import date
+
+class SignupForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired(), Length(min=4, max=20)])
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    company_name = StringField('Company Name', validators=[DataRequired(), Length(min=2, max=100)])
+    password = PasswordField('Password', validators=[DataRequired(), Length(min=6)])
+    password2 = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
+
+class LoginForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired()])
+    password = PasswordField('Password', validators=[DataRequired()])
+    remember_me = BooleanField('Remember Me')
 
 class ProjectForm(FlaskForm):
     name = StringField('Project Name', validators=[DataRequired(), Length(min=2, max=100)])
     client = StringField('Client', validators=[DataRequired(), Length(min=2, max=100)])
     start_date = DateField('Start Date', validators=[DataRequired()])
     end_date = DateField('End Date', validators=[])
+    total_allocated_hours = FloatField('Total Allocated Hours', validators=[DataRequired(), NumberRange(min=0.01, max=10000)])
     
     def validate_end_date(self, field):
         if field.data and self.start_date.data and field.data < self.start_date.data:
@@ -27,8 +40,13 @@ class ProjectStaffForm(FlaskForm):
     
     def __init__(self, *args, **kwargs):
         super(ProjectStaffForm, self).__init__(*args, **kwargs)
-        self.employee_id.choices = [(e.id, e.name) for e in Employee.query.order_by(Employee.name).all()]
-        self.project_id.choices = [(p.id, p.name) for p in Project.query.order_by(Project.name).all()]
+        from flask_login import current_user
+        if current_user.is_authenticated:
+            self.employee_id.choices = [(e.id, e.name) for e in Employee.query.filter_by(company_id=current_user.company_id).order_by(Employee.name).all()]
+            self.project_id.choices = [(p.id, p.name) for p in Project.query.filter_by(company_id=current_user.company_id).order_by(Project.name).all()]
+        else:
+            self.employee_id.choices = []
+            self.project_id.choices = []
     
     def validate(self, extra_validators=None):
         if not super().validate(extra_validators):
@@ -56,8 +74,13 @@ class HoursEntryForm(FlaskForm):
     
     def __init__(self, *args, **kwargs):
         super(HoursEntryForm, self).__init__(*args, **kwargs)
-        self.employee_id.choices = [(e.id, e.name) for e in Employee.query.order_by(Employee.name).all()]
-        self.project_id.choices = [(p.id, p.name) for p in Project.query.order_by(Project.name).all()]
+        from flask_login import current_user
+        if current_user.is_authenticated:
+            self.employee_id.choices = [(e.id, e.name) for e in Employee.query.filter_by(company_id=current_user.company_id).order_by(Employee.name).all()]
+            self.project_id.choices = [(p.id, p.name) for p in Project.query.filter_by(company_id=current_user.company_id).order_by(Project.name).all()]
+        else:
+            self.employee_id.choices = []
+            self.project_id.choices = []
     
     def validate_hours_billed(self, field):
         if field.data > self.hours_worked.data:
