@@ -104,7 +104,11 @@
                 <div class="progress mb-3">
                     {% set progress_percentage = (project.total_hours_worked / project.total_allocated_hours * 100) if project.total_allocated_hours > 0 else 0 %}
                     <div class="progress-bar bg-primary" role="progressbar" 
-                         style="width: {{ [progress_percentage, 100] | min }}%"
+                         {% if progress_percentage > 100 %}
+                         style="width: 100%"
+                         {% else %}
+                         style="width: {{ progress_percentage }}%"
+                         {% endif %}
                          aria-valuenow="{{ progress_percentage }}" 
                          aria-valuemin="0" 
                          aria-valuemax="100">
