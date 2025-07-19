@@ -108,6 +108,18 @@ Commission Tracker is a Flask-based web application designed to manage projects,
 - July 1, 2025. Updated to modern light theme with sky blue accents and advanced styling
 
 ## Recent Changes
+- **July 19, 2025**: Major migration from Replit Agent to standard Replit with authentication
+  - Implemented Flask-Login authentication system with company-based user registration
+  - Added Company model for multi-tenant architecture
+  - Enhanced Project model with unique project_id field and total_allocated_hours
+  - Implemented remaining_hours calculation (allocated - worked hours)
+  - Enhanced HoursEntry model with date and description fields for line items
+  - Updated all routes to include authentication and company data isolation
+  - Created comprehensive project detail view with hour entry line items
+  - Added authentication navigation with user dropdown and company display
+  - Updated all forms to work with company-filtered data
+  - Enhanced templates to display new fields (project ID, allocated hours, remaining hours)
+  - Migrated to PostgreSQL database for better performance and reliability
 - **July 1, 2025**: Complete design overhaul implementing modern, fresh styling
   - Switched from dark to light theme with sky blue color palette
   - Added Inter font for improved typography
