@@ -3,17 +3,19 @@
 {% block title %}Projects - Commission Tracker{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
+<div class="row mb-4 align-items-center">
     <div class="col">
-        <h1>
-            <i data-feather="folder"></i>
-            Projects
+        <h1 class="d-flex align-items-center">
+            <i data-feather="folder" class="me-2"></i>
+            Project Management
         </h1>
-        <p class="text-muted">Manage your projects and track their progress</p>
+        <p class="text-muted">
+            Create, manage, and monitor projects with real-time tracking of hours, revenue, and team assignments.
+        </p>
     </div>
     <div class="col-auto">
         <a href="{{ url_for('projects_new') }}" class="btn btn-primary">
-            <i data-feather="plus"></i> New Project
+            <i data-feather="plus" class="me-1"></i> Create New Project
         </a>
     </div>
 </div>
@@ -22,40 +24,38 @@
     <div class="card-body">
         {% if projects.items %}
             <div class="table-responsive">
-                <table class="table table-striped">
+                <table class="table table-striped align-middle">
                     <thead>
                         <tr>
                             <th>Project ID</th>
                             <th>Name</th>
                             <th>Client</th>
-                            <th>Allocated Hours</th>
-                            <th>Hours Worked</th>
-                            <th>Remaining Hours</th>
-                            <th>Revenue</th>
-                            <th>Actions</th>
+                            <th class="text-end">Allocated Hours</th>
+                            <th class="text-end">Hours Worked</th>
+                            <th class="text-end">Remaining Hours</th>
+                            <th class="text-end">Revenue</th>
+                            <th class="text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for project in projects.items %}
                         <tr>
-                            <td>
-                                <code class="text-muted">{{ project.project_id[:8] }}...</code>
-                            </td>
+                            <td><code class="text-muted">{{ project.project_id }}</code></td>
                             <td>
                                 <a href="{{ url_for('projects_detail', id=project.id) }}" class="text-decoration-none">
                                     <strong>{{ project.name }}</strong>
                                 </a>
                             </td>
                             <td>{{ project.client }}</td>
-                            <td>{{ "%.1f"|format(project.total_allocated_hours) }}</td>
-                            <td>{{ "%.1f"|format(project.total_hours_worked) }}</td>
-                            <td>
+                            <td class="text-end">{{ "%.1f"|format(project.total_allocated_hours) }}</td>
+                            <td class="text-end">{{ "%.1f"|format(project.total_hours_worked) }}</td>
+                            <td class="text-end">
                                 <span class="{% if project.remaining_hours < 0 %}text-danger{% else %}text-success{% endif %}">
                                     {{ "%.1f"|format(project.remaining_hours) }}
                                 </span>
                             </td>
-                            <td>${{ "%.2f"|format(project.total_revenue) }}</td>
-                            <td>
+                            <td class="text-end">${{ "%.2f"|format(project.total_revenue) }}</td>
+                            <td class="text-center">
                                 <div class="btn-group btn-group-sm">
                                     <a href="{{ url_for('projects_detail', id=project.id) }}" class="btn btn-outline-primary">
                                         <i data-feather="eye"></i>
@@ -63,7 +63,7 @@
                                     <a href="{{ url_for('projects_edit', id=project.id) }}" class="btn btn-outline-secondary">
                                         <i data-feather="edit-2"></i>
                                     </a>
-                                    <form method="POST" action="{{ url_for('projects_delete', id=project.id) }}" class="d-inline" 
+                                    <form method="POST" action="{{ url_for('projects_delete', id=project.id) }}" class="d-inline"
                                           onsubmit="return confirm('Are you sure you want to delete this project?')">
                                         <button type="submit" class="btn btn-outline-danger">
                                             <i data-feather="trash-2"></i>
@@ -76,7 +76,7 @@
                     </tbody>
                 </table>
             </div>
-            
+
             {% include 'components/pagination.html' %}
         {% else %}
             <div class="text-center py-5">
@@ -90,4 +90,5 @@
         {% endif %}
     </div>
 </div>
+
 {% endblock %}

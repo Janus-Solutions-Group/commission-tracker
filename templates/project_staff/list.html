@@ -3,17 +3,19 @@
 {% block title %}Project Assignments - Commission Tracker{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
+<div class="row mb-4 align-items-center">
     <div class="col">
-        <h1>
-            <i data-feather="user-plus"></i>
+        <h1 class="d-flex align-items-center">
+            <i data-feather="user-plus" class="me-2"></i>
             Project Assignments
         </h1>
-        <p class="text-muted">Manage employee assignments to projects</p>
+        <p class="text-muted">
+            Assign employees to projects, define their roles, and manage staffing allocations effectively.
+        </p>
     </div>
     <div class="col-auto">
         <a href="{{ url_for('project_staff_new') }}" class="btn btn-primary">
-            <i data-feather="plus"></i> New Assignment
+            <i data-feather="plus" class="me-1"></i> Assign Employee to Project
         </a>
     </div>
 </div>
@@ -22,34 +24,34 @@
     <div class="card-body">
         {% if project_staff.items %}
             <div class="table-responsive">
-                <table class="table table-striped">
+                <table class="table table-striped align-middle">
                     <thead>
                         <tr>
                             <th>Employee</th>
-                            <th>Employee Role</th>
+                            <th class="text-center">Employee Role</th>
                             <th>Project</th>
-                            <th>Role on Project</th>
+                            <th class="text-center">Role on Project</th>
                             <th>Client</th>
-                            <th>Assigned Date</th>
-                            <th>Actions</th>
+                            <th class="text-center">Assigned Date</th>
+                            <th class="text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for assignment in project_staff.items %}
                         <tr>
-                            <td>
-                                <strong>{{ assignment.employee.name }}</strong>
-                            </td>
-                            <td>
+                            <td><strong>{{ assignment.employee.name }}</strong></td>
+                            <td class="text-center">
                                 <span class="badge bg-secondary">{{ assignment.employee.role }}</span>
                             </td>
                             <td>{{ assignment.project.name }}</td>
-                            <td>
+                            <td class="text-center">
                                 <span class="badge bg-primary">{{ assignment.role_on_project }}</span>
                             </td>
                             <td>{{ assignment.project.client }}</td>
-                            <td>{{ assignment.created_at.strftime('%Y-%m-%d') }}</td>
-                            <td>
+                            <td class="text-center">
+                                {{ assignment.created_at.strftime('%m/%d/%Y') }}
+                            </td>
+                            <td class="text-center">
                                 <div class="btn-group btn-group-sm">
                                     <a href="{{ url_for('project_staff_edit', id=assignment.id) }}" class="btn btn-outline-secondary">
                                         <i data-feather="edit-2"></i>
@@ -67,7 +69,7 @@
                     </tbody>
                 </table>
             </div>
-            
+
             {% include 'components/pagination.html' %}
         {% else %}
             <div class="text-center py-5">
@@ -81,4 +83,5 @@
         {% endif %}
     </div>
 </div>
+
 {% endblock %}

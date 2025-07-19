@@ -18,6 +18,7 @@ class LoginForm(FlaskForm):
 
 class ProjectForm(FlaskForm):
     name = StringField('Project Name', validators=[DataRequired(), Length(min=2, max=100)])
+    project_id = StringField('Project ID', validators=[DataRequired(), Length(min=2, max=100)])
     client = StringField('Client', validators=[DataRequired(), Length(min=2, max=100)])
     start_date = DateField('Start Date', validators=[DataRequired()])
     end_date = DateField('End Date', validators=[])

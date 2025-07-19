@@ -53,7 +53,8 @@ def login():
     
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
+        user = User.query.filter_by(email=form.username.data).first()
+        print(user)
         if user and user.check_password(form.password.data):
             login_user(user, remember=form.remember_me.data)
             next_page = request.args.get('next')
@@ -157,6 +158,7 @@ def projects_new():
     if form.validate_on_submit():
         project = Project(
             name=form.name.data,
+            project_id=form.project_id.data,
             client=form.client.data,
             start_date=form.start_date.data,
             end_date=form.end_date.data,
