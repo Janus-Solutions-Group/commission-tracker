@@ -225,7 +225,6 @@ def employees_new():
             name=form.name.data,
             role=form.role.data,
             hourly_rate=form.hourly_rate.data,
-            commission_percentage=form.commission_percentage.data,
             company_id=current_user.company_id
         )
         db.session.add(employee)
@@ -275,7 +274,9 @@ def project_staff_new():
         project_staff = ProjectStaff(
             employee_id=form.employee_id.data,
             project_id=form.project_id.data,
-            role_on_project=form.role_on_project.data
+            role_on_project=form.role_on_project.data,
+            commission_percentage=form.commission_percentage.data,
+            is_director=form.is_director.data
         )
         db.session.add(project_staff)
         db.session.commit()

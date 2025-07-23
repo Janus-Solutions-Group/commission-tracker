@@ -65,8 +65,11 @@ class Project(db.Model):
     @property
     def total_revenue(self):
         total = 0
-        for entry in self.hours_entries:
-            total += entry.hours_billed * entry.employee.hourly_rate
+        entries = HoursEntry.query.filter_by(project_id=self.id).all()
+        for entry in entries:
+            employee = Employee.query.get(entry.employee_id)
+            if employee:
+                total += entry.hours_billed * employee.hourly_rate
         return total
     
     @property
@@ -78,7 +81,6 @@ class Employee(db.Model):
     name = db.Column(db.String(100), nullable=False)
     role = db.Column(db.String(50), nullable=False)
     hourly_rate = db.Column(db.Float, nullable=False)
-    commission_percentage = db.Column(db.Float, nullable=False)
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -91,9 +93,18 @@ class Employee(db.Model):
     
     @property
     def total_commission(self):
+        from sqlalchemy.orm import joinedload
         total = 0
-        for entry in self.hours_entries:
-            total += entry.hours_billed * self.hourly_rate * (self.commission_percentage / 100)
+        entries = db.session.query(HoursEntry).filter_by(employee_id=self.id).all()
+        for entry in entries:
+            # Get commission percentage from project assignment
+            project_staff = ProjectStaff.query.filter_by(
+                employee_id=self.id, 
+                project_id=entry.project_id
+            ).first()
+            if project_staff:
+                commission_rate = project_staff.commission_percentage / 100
+                total += entry.hours_billed * self.hourly_rate * commission_rate
         return total
     
     @property
@@ -109,13 +120,44 @@ class ProjectStaff(db.Model):
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
     role_on_project = db.Column(db.String(50), nullable=False)
+    commission_percentage = db.Column(db.Float, nullable=False, default=0.0)
+    is_director = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Unique constraint to prevent duplicate assignments
     __table_args__ = (db.UniqueConstraint('employee_id', 'project_id', name='unique_employee_project'),)
     
     def __repr__(self):
-        return f'<ProjectStaff {self.employee.name} on {self.project.name}>'
+        return f'<ProjectStaff {self.id}>'
+    
+    @property
+    def override_commission(self):
+        """Calculate 2% override commission for directors based on associate revenue"""
+        if not self.is_director:
+            return 0.0
+        
+        # Get all associates (non-directors) in this project
+        associate_staff = ProjectStaff.query.filter_by(
+            project_id=self.project_id, 
+            is_director=False
+        ).all()
+        
+        total_associate_revenue = 0
+        for associate in associate_staff:
+            # Get hours entries for this associate on this project
+            entries = HoursEntry.query.filter_by(
+                employee_id=associate.employee_id,
+                project_id=self.project_id
+            ).all()
+            
+            for entry in entries:
+                employee = Employee.query.get(associate.employee_id)
+                if employee:
+                    revenue = entry.hours_billed * employee.hourly_rate
+                    total_associate_revenue += revenue
+        
+        # Director gets 2% override on associate revenue
+        return total_associate_revenue * 0.02
 
 class HoursEntry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -128,12 +170,35 @@ class HoursEntry(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def __repr__(self):
-        return f'<HoursEntry {self.employee.name} - {self.project.name} - {self.date}>'
+        return f'<HoursEntry {self.id} - {self.date}>'
     
     @property
     def commission_earned(self):
-        return self.hours_billed * self.employee.hourly_rate * (self.employee.commission_percentage / 100)
+        # Get commission percentage from project assignment
+        project_staff = ProjectStaff.query.filter_by(
+            employee_id=self.employee_id, 
+            project_id=self.project_id
+        ).first()
+        
+        if not project_staff:
+            return 0.0
+            
+        commission_rate = project_staff.commission_percentage / 100
+        # Get employee hourly rate
+        employee = Employee.query.get(self.employee_id)
+        if not employee:
+            return 0.0
+            
+        base_commission = self.hours_billed * employee.hourly_rate * commission_rate
+        
+        # Add override commission if this employee is a director
+        override_commission = project_staff.override_commission if project_staff.is_director else 0.0
+        
+        return base_commission + override_commission
     
     @property
     def revenue_generated(self):
-        return self.hours_billed * self.employee.hourly_rate
+        employee = Employee.query.get(self.employee_id)
+        if not employee:
+            return 0.0
+        return self.hours_billed * employee.hourly_rate

@@ -32,12 +32,13 @@ class EmployeeForm(FlaskForm):
     name = StringField('Employee Name', validators=[DataRequired(), Length(min=2, max=100)])
     role = StringField('Role', validators=[DataRequired(), Length(min=2, max=50)])
     hourly_rate = FloatField('Hourly Rate ($)', validators=[DataRequired(), NumberRange(min=0.01, max=10000)])
-    commission_percentage = FloatField('Commission Percentage (%)', validators=[DataRequired(), NumberRange(min=0, max=100)])
 
 class ProjectStaffForm(FlaskForm):
     employee_id = SelectField('Employee', coerce=int, validators=[DataRequired()])
     project_id = SelectField('Project', coerce=int, validators=[DataRequired()])
     role_on_project = StringField('Role on Project', validators=[DataRequired(), Length(min=2, max=50)])
+    commission_percentage = FloatField('Commission Percentage (%)', validators=[DataRequired(), NumberRange(min=0, max=100)])
+    is_director = BooleanField('Is Project Director')
     
     def __init__(self, *args, **kwargs):
         super(ProjectStaffForm, self).__init__(*args, **kwargs)

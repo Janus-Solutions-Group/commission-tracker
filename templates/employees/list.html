@@ -30,7 +30,7 @@
                             <th>Name</th>
                             <th class="text-center">Role</th>
                             <th class="text-end">Hourly Rate</th>
-                            <th class="text-end">Commission %</th>
+                            <th class="text-center">Project Assignments</th>
                             <th class="text-end">Total Hours</th>
                             <th class="text-end">Total Commission</th>
                             <th class="text-center">Actions</th>
@@ -44,7 +44,9 @@
                                 <span class="badge bg-secondary">{{ employee.role }}</span>
                             </td>
                             <td class="text-end">${{ "%.2f"|format(employee.hourly_rate) }}</td>
-                            <td class="text-end">{{ "%.f"|format(employee.commission_percentage) }}%</td>
+                            <td class="text-center">
+                                <span class="badge bg-info">{{ employee.project_staff|length }} projects</span>
+                            </td>
                             <td class="text-end">{{ "%.2f"|format(employee.total_hours_worked) }}</td>
                             <td class="text-end">
                                 <strong class="text-success">${{ "%.2f"|format(employee.total_commission) }}</strong>

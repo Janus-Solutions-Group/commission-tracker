@@ -53,6 +53,43 @@
                         {% endif %}
                     </div>
 
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                {{ form.commission_percentage.label(class="form-label") }}
+                                <div class="input-group">
+                                    {{ form.commission_percentage(class="form-control" + (" is-invalid" if form.commission_percentage.errors else ""), step="0.1") }}
+                                    <span class="input-group-text">%</span>
+                                    {% if form.commission_percentage.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.commission_percentage.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="form-text">Set the commission percentage for this employee on this project</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">&nbsp;</label>
+                                <div class="form-check">
+                                    {{ form.is_director(class="form-check-input" + (" is-invalid" if form.is_director.errors else "")) }}
+                                    {{ form.is_director.label(class="form-check-label") }}
+                                    {% if form.is_director.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.is_director.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="form-text">Directors get 2% override on associate revenue</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-between">
                         <a href="{{ url_for('project_staff_list') }}" class="btn btn-secondary">
                             <i data-feather="arrow-left"></i> Back to Assignments

@@ -40,39 +40,21 @@
                         {% endif %}
                     </div>
 
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                {{ form.hourly_rate.label(class="form-label") }}
-                                <div class="input-group">
-                                    <span class="input-group-text">$</span>
-                                    {{ form.hourly_rate(class="form-control" + (" is-invalid" if form.hourly_rate.errors else ""), step="0.01") }}
-                                    {% if form.hourly_rate.errors %}
-                                        <div class="invalid-feedback">
-                                            {% for error in form.hourly_rate.errors %}
-                                                {{ error }}
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
+                    <div class="mb-3">
+                        {{ form.hourly_rate.label(class="form-label") }}
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            {{ form.hourly_rate(class="form-control" + (" is-invalid" if form.hourly_rate.errors else ""), step="0.01") }}
+                            {% if form.hourly_rate.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.hourly_rate.errors %}
+                                        {{ error }}
+                                    {% endfor %}
                                 </div>
-                            </div>
+                            {% endif %}
                         </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                {{ form.commission_percentage.label(class="form-label") }}
-                                <div class="input-group">
-                                    {{ form.commission_percentage(class="form-control" + (" is-invalid" if form.commission_percentage.errors else ""), step="0.1") }}
-                                    <span class="input-group-text">%</span>
-                                    {% if form.commission_percentage.errors %}
-                                        <div class="invalid-feedback">
-                                            {% for error in form.commission_percentage.errors %}
-                                                {{ error }}
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
+                        <div class="form-text">Commission percentages are now set when assigning employees to projects</div>
+
                     </div>
 
                     <div class="d-flex justify-content-between">
