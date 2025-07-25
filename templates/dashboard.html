@@ -34,7 +34,6 @@
                             <tr>
                                 <th>Employee</th>
                                 <th class="text-end">Rate</th>
-                                <th class="text-end">Comm. %</th>
                                 <th class="text-end">Hours Worked</th>
                                 <th class="text-end">Hours Billed</th>
                                 <th class="text-end">Hours Remaining</th>
@@ -51,7 +50,6 @@
                                     <span class="text-muted small">{{ employee.role }}</span>
                                 </td>
                                 <td class="text-end">${{ "%.2f"|format(employee.hourly_rate) }}</td>
-                                <td class="text-end">{{ "%.1f"|format(employee.commission_percentage) }}%</td>
                                 <td class="text-end">{{ "%.2f"|format(worked or 0) }}</td>
                                 <td class="text-end">{{ "%.2f"|format(billed or 0) }}</td>
                                 <td class="text-end">{{ "%.2f"|format((worked or 0) - (billed or 0)) }}</td>
@@ -70,7 +68,6 @@
                         </tbody>
                         <tfoot class="table-dark">
                             <tr>
-                                <th class="text-end"></th>
                                 <th class="text-end"></th>
                                 <th class="text-end"></th>
                                 <th class="text-end">{{ "%.2f"|format(employee_stats|sum(attribute=1) or 0) }}</th>
@@ -107,6 +104,65 @@
         </div>
     </div>
 </div>
+
+
+<!-- Director Performance -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i data-feather="users"></i>
+                    Director Performance
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if director_stats %}
+                <div class="table-responsive">
+                    <table class="table table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>Director</th>
+                                <th class="text-end">Worked</th>
+                                <th class="text-end">Billed</th>
+                                <th class="text-center">Efficiency</th>
+                                <th class="text-end">Revenue</th>
+                                <th class="text-end">Team Commission</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in director_stats %}
+                            <tr>
+                                <td><strong>{{ d.director.name }}</strong></td>
+                                <td class="text-end">{{ "%.2f"|format(d.worked or 0) }}</td>
+                                <td class="text-end">{{ "%.2f"|format(d.billed or 0) }}</td>
+                                <td class="text-center">
+                                    {% set efficiency = ((d.billed or 0) / (d.worked or 1) * 100) %}
+                                    <span class="badge {% if efficiency >= 90 %}bg-success{% elif efficiency >= 70 %}bg-warning{% else %}bg-danger{% endif %}">
+                                        {{ "%.1f"|format(efficiency) }}%
+                                    </span>
+                                </td>
+                                <td class="text-end">${{ "%.2f"|format(d.revenue or 0) }}</td>
+                                <td class="text-end text-success">${{ "%.2f"|format(d.commission or 0) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+
+                {% else %}
+                    <div class="text-center py-4">
+                        <i data-feather="users" style="width: 48px; height: 48px;" class="text-muted mb-3"></i>
+                        <h5 class="text-muted">No director data available</h5>
+                        <p class="text-muted">Add directors and hours entries to see performance metrics.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <!-- Project Performance -->
 <div class="row">

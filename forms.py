@@ -24,9 +24,9 @@ class ProjectForm(FlaskForm):
     end_date = DateField('End Date', validators=[])
     total_allocated_hours = FloatField('Total Allocated Hours', validators=[DataRequired(), NumberRange(min=0.01, max=10000)])
     
-    def validate_end_date(self, field):
-        if field.data and self.start_date.data and field.data < self.start_date.data:
-            raise ValidationError('End date must be after start date.')
+    # def validate_end_date(self, field):
+    #     if field.data and self.start_date.data and field.data < self.start_date.data:
+    #         raise ValidationError('End date must be after start date.')
 
 class EmployeeForm(FlaskForm):
     name = StringField('Employee Name', validators=[DataRequired(), Length(min=2, max=100)])
@@ -36,9 +36,9 @@ class EmployeeForm(FlaskForm):
 class ProjectStaffForm(FlaskForm):
     employee_id = SelectField('Employee', coerce=int, validators=[DataRequired()])
     project_id = SelectField('Project', coerce=int, validators=[DataRequired()])
-    role_on_project = StringField('Role on Project', validators=[DataRequired(), Length(min=2, max=50)])
+    # role_on_project = StringField('Role on Project', validators=[DataRequired(), Length(min=2, max=50)])
     commission_percentage = FloatField('Commission Percentage (%)', validators=[DataRequired(), NumberRange(min=0, max=100)])
-    is_director = BooleanField('Is Project Director')
+    # is_director = BooleanField('Is Project Director')
     
     def __init__(self, *args, **kwargs):
         super(ProjectStaffForm, self).__init__(*args, **kwargs)

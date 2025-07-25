@@ -78,35 +78,44 @@ def index():
     # Get summary statistics for current user's company
     total_projects = Project.query.filter_by(company_id=current_user.company_id).count()
     total_employees = Employee.query.filter_by(company_id=current_user.company_id).count()
-    
-    # Total commission for current company
+
+    # Total commission for current company (using ProjectStaff commission)
     total_commission = db.session.query(
-        func.sum(HoursEntry.hours_billed * Employee.hourly_rate * Employee.commission_percentage / 100)
-    ).join(Employee).join(Project).filter(Project.company_id == current_user.company_id).scalar() or 0
-    
+        func.sum(HoursEntry.hours_billed * Employee.hourly_rate * ProjectStaff.commission_percentage / 100)
+    ).join(Employee, HoursEntry.employee_id == Employee.id
+    ).join(Project, HoursEntry.project_id == Project.id
+    ).join(ProjectStaff, (ProjectStaff.employee_id == Employee.id) & (ProjectStaff.project_id == Project.id)
+    ).filter(Project.company_id == current_user.company_id).scalar() or 0
+
     # Total revenue for current company
     total_revenue = db.session.query(
         func.sum(HoursEntry.hours_billed * Employee.hourly_rate)
-    ).join(Employee).join(Project).filter(Project.company_id == current_user.company_id).scalar() or 0
-    
+    ).join(Employee
+    ).join(Project
+    ).filter(Project.company_id == current_user.company_id).scalar() or 0
+
     # Recent hours entries for current company
     recent_entries = HoursEntry.query.join(Project).filter(
         Project.company_id == current_user.company_id
     ).order_by(desc(HoursEntry.created_at)).limit(5).all()
-    
-    # Top performers by commission for current company
+
+    # Top performers by commission
     top_performers = db.session.query(
         Employee,
-        func.sum(HoursEntry.hours_billed * Employee.hourly_rate * Employee.commission_percentage / 100).label('total_commission')
-    ).join(HoursEntry).filter(Employee.company_id == current_user.company_id).group_by(Employee.id).order_by(desc('total_commission')).limit(5).all()
-    
+        func.sum(HoursEntry.hours_billed * Employee.hourly_rate * ProjectStaff.commission_percentage / 100).label('total_commission')
+    ).join(HoursEntry, HoursEntry.employee_id == Employee.id
+    ).join(Project, HoursEntry.project_id == Project.id
+    ).join(ProjectStaff, (ProjectStaff.employee_id == Employee.id) & (ProjectStaff.project_id == Project.id)
+    ).filter(Employee.company_id == current_user.company_id
+    ).group_by(Employee.id).order_by(desc('total_commission')).limit(5).all()
+
     return render_template('index.html',
-                         total_projects=total_projects,
-                         total_employees=total_employees,
-                         total_commission=total_commission,
-                         total_revenue=total_revenue,
-                         recent_entries=recent_entries,
-                         top_performers=top_performers)
+                           total_projects=total_projects,
+                           total_employees=total_employees,
+                           total_commission=total_commission,
+                           total_revenue=total_revenue,
+                           recent_entries=recent_entries,
+                           top_performers=top_performers)
 
 @app.route('/dashboard')
 @login_required
@@ -119,12 +128,16 @@ def dashboard():
         func.coalesce(func.sum(HoursEntry.hours_worked), 0).label('total_worked'),
         func.coalesce(func.sum(HoursEntry.hours_billed), 0).label('total_billed'),
         func.coalesce(
-            func.sum(HoursEntry.hours_billed * Employee.hourly_rate * Employee.commission_percentage / 100), 0
+            func.sum(HoursEntry.hours_billed * Employee.hourly_rate * ProjectStaff.commission_percentage / 100), 0
         ).label('total_commission'),
         func.coalesce(
             func.sum(HoursEntry.hours_billed * Employee.hourly_rate), 0
         ).label('total_revenue')
-    ).filter(Employee.company_id == current_user.company_id).outerjoin(HoursEntry).group_by(Employee.id).all()
+    ).join(HoursEntry, HoursEntry.employee_id == Employee.id
+    ).join(Project, HoursEntry.project_id == Project.id
+    ).join(ProjectStaff, (ProjectStaff.employee_id == Employee.id) & (ProjectStaff.project_id == Project.id)
+    ).filter(Employee.company_id == current_user.company_id
+    ).group_by(Employee.id).all()
 
     # Project summary for current company
     project_stats = db.session.query(
@@ -134,11 +147,65 @@ def dashboard():
         func.coalesce(
             func.sum(HoursEntry.hours_billed * Employee.hourly_rate), 0
         ).label('total_revenue')
-    ).filter(Project.company_id == current_user.company_id).outerjoin(HoursEntry).outerjoin(Employee).group_by(Project.id).all()
+    ).join(HoursEntry, HoursEntry.project_id == Project.id
+    ).join(Employee, HoursEntry.employee_id == Employee.id
+    ).filter(Project.company_id == current_user.company_id
+    ).group_by(Project.id).all()
+    director_stats = []
+    directors = db.session.query(Employee).filter(Employee.role == 'Director').all()
+
+    for director in directors:
+        project_ids = db.session.query(ProjectStaff.project_id).filter(ProjectStaff.employee_id == director.id).subquery()
+
+        # Get all associates (excluding director) assigned to those projects
+        associate_ids = db.session.query(ProjectStaff.employee_id).filter(
+            ProjectStaff.project_id.in_(project_ids)
+        ).filter(ProjectStaff.employee_id != director.id).distinct().subquery()
+
+        associates = db.session.query(Employee).filter(Employee.id.in_(associate_ids)).all()
+
+        total_worked = 0
+        total_billed = 0
+        total_revenue = 0
+        total_commission = 0
+        for associate in associates:
+            # Get all ProjectStaff rows for this associate in the relevant projects
+            ps_entries = db.session.query(ProjectStaff).filter(
+                ProjectStaff.employee_id == associate.id,
+                ProjectStaff.project_id.in_(project_ids)
+            ).all()
+
+            for ps in ps_entries:
+                # Get total hours worked and billed by the associate on this project
+                worked = db.session.query(func.sum(HoursEntry.hours_worked)).filter(
+                    HoursEntry.employee_id == associate.id,
+                    HoursEntry.project_id == ps.project_id
+                ).scalar() or 0
+
+                billed = db.session.query(func.sum(HoursEntry.hours_billed)).filter(
+                    HoursEntry.employee_id == associate.id,
+                    HoursEntry.project_id == ps.project_id
+                ).scalar() or 0
+
+                revenue = billed * (associate.hourly_rate or 0)
+                total_worked += worked
+                total_billed += billed
+                total_revenue += revenue
+
+
+        director_stats.append({
+            'director': director,
+            'worked': total_worked,
+            'billed': total_billed,
+            'commission': total_revenue * 0.02,  # 2% override commission
+            'revenue': total_revenue ,
+        })
 
     return render_template('dashboard.html',
                            employee_stats=employee_stats,
-                           project_stats=project_stats)
+                           project_stats=project_stats,
+                           director_stats=director_stats)
+
 # Projects routes
 @app.route('/projects')
 @login_required
@@ -270,14 +337,21 @@ def project_staff_list():
 @login_required
 def project_staff_new():
     form = ProjectStaffForm()
-    if form.validate_on_submit():
+    if form.validate_on_submit():# Fetch employee details
+        employee = Employee.query.get(form.employee_id.data)
+
+        # Fallbacks in case employee doesn't exist
+        role = employee.role if employee else 'Unknown'
+        is_director = employee.role.lower() == 'director' if employee else False
+
         project_staff = ProjectStaff(
             employee_id=form.employee_id.data,
             project_id=form.project_id.data,
-            role_on_project=form.role_on_project.data,
+            role_on_project=role,
             commission_percentage=form.commission_percentage.data,
-            is_director=form.is_director.data
+            is_director=is_director
         )
+
         db.session.add(project_staff)
         db.session.commit()
         flash('Employee assigned to project successfully!', 'success')

@@ -31,7 +31,6 @@
                             <th>Project</th>
                             <th class="text-center">Role on Project</th>
                             <th class="text-end">Commission %</th>
-                            <th class="text-center">Director</th>
                             <th class="text-center">Actions</th>
                         </tr>
                     </thead>
@@ -44,13 +43,6 @@
                                 <span class="badge bg-primary">{{ assignment.role_on_project }}</span>
                             </td>
                             <td class="text-end">{{ "%.1f"|format(assignment.commission_percentage) }}%</td>
-                            <td class="text-center">
-                                {% if assignment.is_director %}
-                                    <span class="badge bg-warning">Director</span>
-                                {% else %}
-                                    <span class="badge bg-light text-dark">Associate</span>
-                                {% endif %}
-                            </td>
                             <td class="text-center">
                                 <div class="btn-group btn-group-sm">
                                     <a href="{{ url_for('project_staff_edit', id=assignment.id) }}" class="btn btn-outline-secondary">

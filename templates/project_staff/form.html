@@ -40,19 +40,6 @@
                         {% endif %}
                     </div>
 
-                    <div class="mb-3">
-                        {{ form.role_on_project.label(class="form-label") }}
-                        {{ form.role_on_project(class="form-control" + (" is-invalid" if form.role_on_project.errors else "")) }}
-                        <div class="form-text">Specify the role this employee will have on this specific project</div>
-                        {% if form.role_on_project.errors %}
-                            <div class="invalid-feedback">
-                                {% for error in form.role_on_project.errors %}
-                                    {{ error }}
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-
                     <div class="row">
                         <div class="col-md-8">
                             <div class="mb-3">
@@ -69,23 +56,6 @@
                                     {% endif %}
                                 </div>
                                 <div class="form-text">Set the commission percentage for this employee on this project</div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label class="form-label">&nbsp;</label>
-                                <div class="form-check">
-                                    {{ form.is_director(class="form-check-input" + (" is-invalid" if form.is_director.errors else "")) }}
-                                    {{ form.is_director.label(class="form-check-label") }}
-                                    {% if form.is_director.errors %}
-                                        <div class="invalid-feedback">
-                                            {% for error in form.is_director.errors %}
-                                                {{ error }}
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                                <div class="form-text">Directors get 2% override on associate revenue</div>
                             </div>
                         </div>
                     </div>
