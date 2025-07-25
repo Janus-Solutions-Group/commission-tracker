@@ -146,6 +146,17 @@
                                 <td class="text-end text-success">${{ "%.2f"|format(d.commission or 0) }}</td>
                             </tr>
                             {% endfor %}
+                            <tfoot class="table-light fw-bold">
+                                <tr>
+                                    <td>Total</td>
+                                    <td class="text-end">{{ "%.2f"|format(director_stats | sum(attribute='worked')) }}</td>
+                                    <td class="text-end">{{ "%.2f"|format(director_stats | sum(attribute='billed')) }}</td>
+                                    <td class="text-center"></td>
+                                    <td class="text-end">${{ "%.2f"|format(director_stats | sum(attribute='revenue')) }}</td>
+                                    <td class="text-end text-success">${{ "%.2f"|format(director_stats | sum(attribute='commission')) }}</td>
+                                </tr>
+                            </tfoot>
+
                         </tbody>
                     </table>
                 </div>

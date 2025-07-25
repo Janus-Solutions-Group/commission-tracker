@@ -74,48 +74,7 @@ def logout():
 @app.route('/')
 @login_required
 def index():
-    """Dashboard with overview statistics"""
-    # Get summary statistics for current user's company
-    total_projects = Project.query.filter_by(company_id=current_user.company_id).count()
-    total_employees = Employee.query.filter_by(company_id=current_user.company_id).count()
-
-    # Total commission for current company (using ProjectStaff commission)
-    total_commission = db.session.query(
-        func.sum(HoursEntry.hours_billed * Employee.hourly_rate * ProjectStaff.commission_percentage / 100)
-    ).join(Employee, HoursEntry.employee_id == Employee.id
-    ).join(Project, HoursEntry.project_id == Project.id
-    ).join(ProjectStaff, (ProjectStaff.employee_id == Employee.id) & (ProjectStaff.project_id == Project.id)
-    ).filter(Project.company_id == current_user.company_id).scalar() or 0
-
-    # Total revenue for current company
-    total_revenue = db.session.query(
-        func.sum(HoursEntry.hours_billed * Employee.hourly_rate)
-    ).join(Employee
-    ).join(Project
-    ).filter(Project.company_id == current_user.company_id).scalar() or 0
-
-    # Recent hours entries for current company
-    recent_entries = HoursEntry.query.join(Project).filter(
-        Project.company_id == current_user.company_id
-    ).order_by(desc(HoursEntry.created_at)).limit(5).all()
-
-    # Top performers by commission
-    top_performers = db.session.query(
-        Employee,
-        func.sum(HoursEntry.hours_billed * Employee.hourly_rate * ProjectStaff.commission_percentage / 100).label('total_commission')
-    ).join(HoursEntry, HoursEntry.employee_id == Employee.id
-    ).join(Project, HoursEntry.project_id == Project.id
-    ).join(ProjectStaff, (ProjectStaff.employee_id == Employee.id) & (ProjectStaff.project_id == Project.id)
-    ).filter(Employee.company_id == current_user.company_id
-    ).group_by(Employee.id).order_by(desc('total_commission')).limit(5).all()
-
-    return render_template('index.html',
-                           total_projects=total_projects,
-                           total_employees=total_employees,
-                           total_commission=total_commission,
-                           total_revenue=total_revenue,
-                           recent_entries=recent_entries,
-                           top_performers=top_performers)
+    return render_template('index.html')
 
 @app.route('/dashboard')
 @login_required
