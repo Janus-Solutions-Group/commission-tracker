@@ -42,7 +42,10 @@
                     <tbody>
                         {% for entry in report_data %}
                         <tr>
-                            <td>{{ entry.employee.name }}</td>
+                            <td>
+                                <strong>{{ entry.employee.name }}</strong><br>
+                                <small class="text-muted">{{ entry.employee.role }}</small>
+                            </td>
                             <td class="text-end">{{ "%.2f"|format(entry.total_hours) }}</td>
                             <td class="text-end">${{ "%.2f"|format(entry.total_revenue) }}</td>
                             <td class="text-end text-success">${{ "%.2f"|format(entry.total_commission) }}</td>

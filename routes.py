@@ -52,7 +52,6 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.username.data).first()
-        print(user)
         if user and user.check_password(form.password.data):
             login_user(user, remember=form.remember_me.data)
             next_page = request.args.get('next')
@@ -130,11 +129,11 @@ def dashboard():
                 note = f"Director: direct + 2% override"
 
             else:
-                assoc_revenue = sum(
-                    rev for eid, rev in emp_revenue.items()
-                    if staff_map[eid].employee.role.lower() == 'associate'
-                )
-                direct_commission = assoc_revenue * (staff.commission_percentage or 0) / 100
+                # assoc_revenue = sum(
+                #     rev for eid, rev in emp_revenue.items()
+                #     if staff_map[eid].employee.role.lower() == 'associate'
+                # )
+                direct_comm = total_project_revenue * (staff.commission_percentage or 0) / 100
                 override_comm = 0
                 note = "Other: % of associate revenue"
             commission = direct_comm + override_comm
@@ -304,6 +303,7 @@ def project_staff_new():
     form = ProjectStaffForm()
     if form.validate_on_submit():# Fetch employee details
         project_staff = ProjectStaff(
+            company_id = current_user.company_id,
             employee_id=form.employee_id.data,
             project_id=form.project_id.data,
             commission_percentage=form.commission_percentage.data,
@@ -363,9 +363,10 @@ def hours_new():
             employee_id=form.employee_id.data,
             project_id=form.project_id.data,
             date=form.date.data,
-            hours_worked=form.hours_worked.data,
+            hours_worked=form.hours_billed.data, # same for now
             hours_billed=form.hours_billed.data,
-            description=form.description.data
+            description=form.description.data,
+            company_id=current_user.company_id
         )
         db.session.add(hours_entry)
         db.session.commit()

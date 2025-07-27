@@ -40,7 +40,7 @@
                             <td><strong>{{ assignment.employee.name }}</strong></td>
                             <td>{{ assignment.project.name }}</td>
                             <td class="text-center">
-                                <span class="badge bg-primary">{{ assignment.role_on_project }}</span>
+                                <span class="badge bg-primary">{{ assignment.employee.role }}</span>
                             </td>
                             <td class="text-end">{{ "%.1f"|format(assignment.commission_percentage) }}%</td>
                             <td class="text-center">

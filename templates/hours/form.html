@@ -45,27 +45,14 @@
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        {{ form.date.label(class="form-label") }}
-                        {{ form.date(class="form-control" + (" is-invalid" if form.date.errors else "")) }}
-                        {% if form.date.errors %}
-                            <div class="invalid-feedback">
-                                {% for error in form.date.errors %}
-                                    {{ error }}
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                {{ form.hours_worked.label(class="form-label") }}
-                                {{ form.hours_worked(class="form-control" + (" is-invalid" if form.hours_worked.errors else ""), step="0.25") }}
-                                <div class="form-text">Total hours spent working</div>
-                                {% if form.hours_worked.errors %}
+                                {{ form.date.label(class="form-label") }}
+                                {{ form.date(class="form-control" + (" is-invalid" if form.date.errors else "")) }}
+                                {% if form.date.errors %}
                                     <div class="invalid-feedback">
-                                        {% for error in form.hours_worked.errors %}
+                                        {% for error in form.date.errors %}
                                             {{ error }}
                                         {% endfor %}
                                     </div>

@@ -139,7 +139,7 @@
                         <tr>
                             <th>Date</th>
                             <th>Employee</th>
-                            <th class="text-end">Hours Worked</th>
+                            <!-- <th class="text-end">Hours Worked</th> -->
                             <th class="text-end">Hours Billed</th>
                             <th class="text-end">Revenue</th>
                             <th class="text-end">Commission</th>
@@ -154,7 +154,7 @@
                                 <strong>{{ entry.employee.name }}</strong><br>
                                 <small class="text-muted">{{ entry.employee.role }}</small>
                             </td>
-                            <td class="text-end">{{ "%.2f"|format(entry.hours_worked) }}</td>
+                            <!-- <td class="text-end">{{ "%.2f"|format(entry.hours_worked) }}</td> -->
                             <td class="text-end">{{ "%.2f"|format(entry.hours_billed) }}</td>
                             <td class="text-end text-success">${{ "%.2f"|format(entry.revenue_generated) }}</td>
                             <td class="text-end text-primary">${{ "%.2f"|format(entry.commission_earned) }}</td>
