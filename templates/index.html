@@ -1,11 +1,83 @@
 {% extends "base.html" %}
-
-{% block title %}Commission Report - Coming Soon{% endblock %}
-
 {% block content %}
-<div class="text-center py-5 animate-fade-in">
-    <h1 class="display-5 fw-bold text-muted">Commission Report</h1>
-    <p class="lead text-secondary">We're working to bring this feature to you. Stay tuned!</p>
-    <img src="{{ url_for('static', filename='1782224.webp') }}" alt="Coming Soon" class="mb-4">
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="POST">
+            {{ form.hidden_tag() }}
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">{{ form.employee_id.label }}</label>
+                    {{ form.employee_id(class="form-select") }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">{{ form.date_from.label }}</label>
+                    {{ form.date_from(class="form-control") }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">{{ form.date_to.label }}</label>
+                    {{ form.date_to(class="form-control") }}
+                </div>
+                <div class="col-md-2">
+                    {{ form.submit(class="btn btn-primary w-100") }}
+                </div>
+            </div>
+        </form>
+    </div>
 </div>
+
+{% if employee %}
+<div class="card">
+    <div class="card-body">
+
+        <h5 class="card-title">Commission Report: {{ employee.name }}</h5>
+        <p class="card-subtitle text-muted mb-3">
+            {{ employee.role }} &mdash;
+            <strong>Total Commission:</strong> ${{ "%.2f"|format(direct_commission) }}
+            {% if override_commission %}
+                | <strong>Override:</strong> ${{ "%.2f"|format(override_commission) }}
+                | <strong>Grand Total:</strong> ${{ "%.2f"|format(direct_commission + override_commission) }}
+            {% endif %}
+        </p>
+
+        {% if report_data %}
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>Project ID</th>
+                        <th>Project Name</th>
+                        <th class="text-end">Hours Billed</th>
+                        <th class="text-end">Bill Rate</th>
+                        <th class="text-end">Direct Commission</th>
+                        <th class="text-end">Override Commission</th>
+                        <th class="text-end">Total Commission</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in report_data %}
+                    <tr>
+                        <td><code class="text-muted">{{ row.project_number }}</code></td>
+                        <td>{{ row.project_name }}</td>
+                        <td class="text-end">{{ "%.2f"|format(row.hours_billed) }}</td>
+                        <td class="text-end">${{ "%.2f"|format(row.bill_rate) }}</td>
+                        <td class="text-end">${{ "%.2f"|format(row.direct_commission) }}</td>
+                        <td class="text-end">${{ "%.2f"|format(row.override_commission) }}</td>
+                        <td class="text-end">${{ "%.2f"|format(row.total_commission) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i data-feather="bar-chart-2" style="width: 64px; height: 64px;" class="text-muted mb-3"></i>
+            <h4 class="text-muted">No commissions found</h4>
+            <p class="text-muted">No work was billed during this period for this employee.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}

@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, FloatField, DateField, TextAreaField, SelectField, IntegerField, PasswordField, BooleanField
+from wtforms import StringField, FloatField, DateField, TextAreaField, SelectField, SubmitField, PasswordField, BooleanField
 from wtforms.validators import DataRequired, NumberRange, Length, ValidationError, Email, EqualTo, Optional
 from models import Employee, Project, ProjectStaff, User, Company
 from datetime import date
@@ -119,3 +119,17 @@ class HoursEntryForm(FlaskForm):
             return False
         
         return True
+
+class CommissionReportForm(FlaskForm):
+    employee_id = SelectField('Employee', coerce=int, validators=[DataRequired()])
+    date_from = DateField('Date From', validators=[DataRequired()])
+    date_to = DateField('Date To', validators=[DataRequired()])
+    submit = SubmitField('Generate Report')
+
+    def set_employee_choices(self, company_id):
+        from app import db
+        self.employee_id.choices = [
+            (e.id, e.name) for e in Employee.query.filter(
+                Employee.company_id == company_id,
+            ).order_by(Employee.name).all()
+        ]

@@ -3,7 +3,7 @@ from flask_login import login_user, logout_user, current_user, login_required
 from urllib.parse import urlparse
 from app import app, db
 from models import Project, Employee, ProjectStaff, HoursEntry, User, Company
-from forms import ProjectForm, EmployeeForm, ProjectStaffForm, HoursEntryForm, SignupForm, LoginForm
+from forms import ProjectForm, EmployeeForm, ProjectStaffForm, HoursEntryForm, SignupForm, LoginForm, CommissionReportForm
 from utils import get_paginated_query
 from sqlalchemy import func, desc
 from sqlalchemy.orm import joinedload
@@ -68,10 +68,96 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 @login_required
 def index():
-    return render_template('index.html')
+    form = CommissionReportForm()
+    form.set_employee_choices(current_user.company_id)
+
+    report_data = []
+    employee = None
+    direct_commission = 0.0
+    override_commission = 0.0
+
+    if form.validate_on_submit():
+        employee_id = form.employee_id.data
+        date_from = form.date_from.data
+        date_to = form.date_to.data
+
+        employee = Employee.query.get_or_404(employee_id)
+
+        projects = Project.query.options(
+            joinedload(Project.project_staff).joinedload(ProjectStaff.employee)
+        ).all()
+        # 
+        all_hours = HoursEntry.query.filter(
+            HoursEntry.employee_id == employee_id,
+            HoursEntry.date >= date_from,
+            HoursEntry.date <= date_to
+        ).all()
+
+        # Map hours by project
+        project_hours_map = {}
+        for entry in all_hours:
+            project_hours_map.setdefault(entry.project_id, []).append(entry)
+
+        for project in projects:
+
+            hours_entries = project_hours_map.get(project.id, [])
+            staff_map = {ps.employee_id: ps for ps in project.project_staff}
+            staff = staff_map.get(employee_id)
+            if not staff:
+                continue
+
+            emp = staff.employee
+            hours = sum(e.hours_worked for e in hours_entries)
+            revenue = hours * (emp.hourly_rate or 0)
+            
+            total_project_revenue = sum(
+                he.hours_worked * (staff_map.get(he.employee_id).employee.hourly_rate or 0)
+                for he in HoursEntry.query.filter(
+                    HoursEntry.project_id == project.id,
+                    HoursEntry.date >= date_from,
+                    HoursEntry.date <= date_to
+                )
+                if staff_map.get(he.employee_id)
+            )
+
+            # Commission calculation
+            if emp.role.lower() == 'associate':
+                direct_comm = revenue * (staff.commission_percentage or 0) / 100
+                override_comm = 0
+                note = "Associate: own hours commission"
+            elif emp.role.lower() == 'director':
+                direct_comm = revenue * (staff.commission_percentage or 0) / 100
+                override_comm = total_project_revenue * 0.02
+                note = "Director: direct + 2% override"
+            else:
+                direct_comm = total_project_revenue * (staff.commission_percentage or 0) / 100
+                override_comm = 0
+                note = "Other: % of associate revenue"
+
+            direct_commission+= direct_comm
+            override_commission+= override_comm
+            report_data.append({
+                "project_number": project.project_id,
+                "project_name": project.name,
+                "hours_billed": hours,
+                "bill_rate": emp.hourly_rate or 0,
+                "direct_commission": direct_comm,
+                "override_commission": override_comm,
+                "total_commission": direct_comm+override_comm,
+            })
+    return render_template(
+        'index.html',
+        form=form,
+        report_data=report_data,
+        employee=employee,
+        direct_commission=direct_commission,
+        override_commission=override_commission,
+        total_commission=direct_commission + override_commission
+    )
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -90,7 +176,6 @@ def dashboard():
 
     # Collated data
     employee_summary = {}
-    project_revenue_map = {}
 
     for project in projects:
         hours_entries = project_hours_map.get(project.id, [])
