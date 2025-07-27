@@ -16,9 +16,7 @@ def signup():
     form = SignupForm()
     if form.validate_on_submit():
         # Check if username or email already exists
-        existing_user = User.query.filter(
-            (User.username == form.username.data) | (User.email == form.email.data)
-        ).first()
+        existing_user = User.query.filter((User.email == form.email.data)).first()
         if existing_user:
             flash('Username or email already exists', 'error')
             return render_template('auth/signup.html', form=form)
@@ -32,7 +30,7 @@ def signup():
         
         # Create user
         user = User(
-            username=form.username.data,
+            username=form.name.data,
             email=form.email.data,
             company_id=company.id,
             is_owner=True  # First user of company becomes owner

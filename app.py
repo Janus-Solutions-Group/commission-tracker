@@ -6,7 +6,7 @@ from flask_login import LoginManager
 from flask_jwt_extended import JWTManager
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
-
+from urllib.parse import quote_plus
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
 
@@ -29,8 +29,16 @@ login_manager.login_message = 'Please log in to access this page.'
 
 jwt = JWTManager(app)
 
-# configure the database
-database_url = os.environ.get("DATABASE_URL", "sqlite:///commission_tracker.db")
+# Raw credentials
+username = "postgres.wfpbsrcskmklqiibxyvg"
+password = "26GLyzU6v@CSAiK"  # contains special characters
+host = "aws-0-us-east-1.pooler.supabase.com"
+port = "5432"
+database = "postgres"
+# Encode password safely
+encoded_password = quote_plus(password)
+# Assemble SQLAlchemy database URL
+database_url = os.environ.get("DATABASE_URL",f"postgresql+psycopg2://{username}:{encoded_password}@{host}:{port}/{database}")
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,

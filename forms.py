@@ -5,7 +5,7 @@ from models import Employee, Project, ProjectStaff, User, Company
 from datetime import date
 
 class SignupForm(FlaskForm):
-    username = StringField('Name', validators=[DataRequired(), Length(min=4, max=20)])
+    name = StringField('Name', validators=[DataRequired(), Length(min=4, max=20)])
     email = StringField('Email', validators=[DataRequired(), Email()])
     company_name = StringField('Company Name', validators=[DataRequired(), Length(min=2, max=100)])
     password = PasswordField('Password', validators=[DataRequired(), Length(min=6)])
