@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, FloatField, DateField, TextAreaField, SelectField, IntegerField, PasswordField, BooleanField
-from wtforms.validators import DataRequired, NumberRange, Length, ValidationError, Email, EqualTo
+from wtforms.validators import DataRequired, NumberRange, Length, ValidationError, Email, EqualTo, Optional
 from models import Employee, Project, ProjectStaff, User, Company
 from datetime import date
 
@@ -21,7 +21,7 @@ class ProjectForm(FlaskForm):
     project_id = StringField('Project ID', validators=[DataRequired(), Length(min=2, max=100)])
     client = StringField('Client', validators=[DataRequired(), Length(min=2, max=100)])
     start_date = DateField('Start Date', validators=[DataRequired()])
-    end_date = DateField('End Date', validators=[])
+    end_date = DateField('End Date', validators=[Optional()])  # <-- This line
     total_allocated_hours = FloatField('Total Allocated Hours', validators=[DataRequired(), NumberRange(min=0.01, max=10000)])
     
     # def validate_end_date(self, field):
