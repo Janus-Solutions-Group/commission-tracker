@@ -62,15 +62,15 @@ class ProjectStaffForm(FlaskForm):
         if not super().validate(extra_validators):
             return False
         
-        # Check if this employee is already assigned to this project
-        existing = ProjectStaff.query.filter_by(
-            employee_id=self.employee_id.data,
-            project_id=self.project_id.data
-        ).first()
+        # # Check if this employee is already assigned to this project
+        # existing = ProjectStaff.query.filter_by(
+        #     employee_id=self.employee_id.data,
+        #     project_id=self.project_id.data
+        # ).first()
         
-        if existing:
-            self.employee_id.errors.append('This employee is already assigned to this project.')
-            return False
+        # if existing:
+        #     self.employee_id.errors.append('This employee is already assigned to this project.')
+        #     return False
         
         return True
 
