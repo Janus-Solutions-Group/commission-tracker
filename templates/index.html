@@ -3,26 +3,33 @@
 
 <div class="card mb-4">
     <div class="card-body">
-        <form method="POST">
-            {{ form.hidden_tag() }}
-            <div class="row g-3 align-items-end">
-                <div class="col-md-4">
-                    <label class="form-label">{{ form.employee_id.label }}</label>
-                    {{ form.employee_id(class="form-select") }}
+        {% if form.employee_id.choices %}
+            <form method="POST">
+                {{ form.hidden_tag() }}
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label">{{ form.employee_id.label }}</label>
+                        {{ form.employee_id(class="form-select") }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">{{ form.date_from.label }}</label>
+                        {{ form.date_from(class="form-control") }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">{{ form.date_to.label }}</label>
+                        {{ form.date_to(class="form-control") }}
+                    </div>
+                    <div class="col-md-2">
+                        {{ form.submit(class="btn btn-primary w-100") }}
+                    </div>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">{{ form.date_from.label }}</label>
-                    {{ form.date_from(class="form-control") }}
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">{{ form.date_to.label }}</label>
-                    {{ form.date_to(class="form-control") }}
-                </div>
-                <div class="col-md-2">
-                    {{ form.submit(class="btn btn-primary w-100") }}
-                </div>
+            </form>
+        {% else %}
+            <div class="text-center text-muted py-4">
+                <h5>No employees found for your company.</h5>
+                <p class="mb-0">Please add employees before generating a commission report.</p>
             </div>
-        </form>
+        {% endif %}
     </div>
 </div>
 

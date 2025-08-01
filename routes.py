@@ -166,7 +166,7 @@ def dashboard():
     # Prefetch all relevant data
     projects = Project.query.options(
         joinedload(Project.project_staff).joinedload(ProjectStaff.employee)
-    ).all()
+    ).filter_by(company_id=current_user.company_id)
     all_hours = HoursEntry.query.all()
 
     # Map hours by project
