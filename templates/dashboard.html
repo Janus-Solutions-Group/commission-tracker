@@ -14,6 +14,27 @@
         </p>
     </div>
 </div>
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="POST">
+            {{ form.hidden_tag() }}
+            <div class="row g-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label">{{ form.date_from.label }}</label>
+                    {{ form.date_from(class="form-control") }}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">{{ form.date_to.label }}</label>
+                    {{ form.date_to(class="form-control") }}
+                </div>
+                <div class="col-md-2">
+                    {{ form.submit(class="btn btn-primary w-100") }}
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
 
 
 <!-- Employee Performance -->

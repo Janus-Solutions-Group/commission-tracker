@@ -133,3 +133,8 @@ class CommissionReportForm(FlaskForm):
                 Employee.company_id == company_id,
             ).order_by(Employee.name).all()
         ]
+
+class DateRangeForm(FlaskForm):
+    date_from = DateField("From", validators=[DataRequired()])
+    date_to = DateField("To", validators=[DataRequired()])
+    submit = SubmitField("Filter")
