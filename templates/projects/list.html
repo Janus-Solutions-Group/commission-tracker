@@ -27,12 +27,13 @@
                 <table class="table table-striped align-middle">
                     <thead>
                         <tr>
-                            <th>Project ID</th>
+                            <th>PID</th>
                             <th>Name</th>
                             <th>Client</th>
-                            <th class="text-end">Allocated Hours</th>
-                            <th class="text-end">Hours Worked</th>
-                            <th class="text-end">Remaining Hours</th>
+                            <th class="text-end">Allocated Hrs</th>
+                            <th class="text-end">Extra Hrs</th>
+                            <th class="text-end">Worked Hrs</th>
+                            <th class="text-end">Remaining Hrs</th>
                             <th class="text-end">Revenue</th>
                             <th class="text-center">Actions</th>
                         </tr>
@@ -48,6 +49,7 @@
                             </td>
                             <td>{{ project.client }}</td>
                             <td class="text-end">{{ "%.1f"|format(project.total_allocated_hours) }}</td>
+                            <td class="text-end">{{ "%.1f"|format(project.extra_hours) }}</td>
                             <td class="text-end">{{ "%.1f"|format(project.total_hours_worked) }}</td>
                             <td class="text-end">
                                 <span class="{% if project.remaining_hours < 0 %}text-danger{% else %}text-success{% endif %}">

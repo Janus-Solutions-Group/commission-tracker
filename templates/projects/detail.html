@@ -33,16 +33,16 @@
     <div class="col-md-3">
         <div class="card">
             <div class="card-body text-center">
-                <h4 class="text-info">{{ "%.1f"|format(project.total_hours_worked) }}</h4>
-                <small class="text-muted">Hours Worked</small>
+                <h4 class="text-primary">{{ "%.1f"|format(project.extra_hours) }}</h4>
+                <small class="text-muted">Extra Hours</small>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card">
             <div class="card-body text-center">
-                <h4 class="text-success">{{ "%.1f"|format(project.total_hours_billed) }}</h4>
-                <small class="text-muted">Hours Billed</small>
+                <h4 class="text-info">{{ "%.1f"|format(project.total_hours_worked) }}</h4>
+                <small class="text-muted">Hours Worked</small>
             </div>
         </div>
     </div>
@@ -58,7 +58,7 @@
     </div>
 </div>
 
-<div class="row">
+<div class="row mb-4">
     <div class="col-md-6">
         <div class="card mb-4">
             <div class="card-header">
@@ -102,7 +102,7 @@
             </div>
             <div class="card-body">
                 <div class="progress mb-3">
-                    {% set progress_percentage = (project.total_hours_worked / project.total_allocated_hours * 100) if project.total_allocated_hours > 0 else 0 %}
+                    {% set progress_percentage = (project.total_hours_worked / (project.total_allocated_hours + project.extra_hours) * 100) if (project.total_allocated_hours + project.extra_hours) > 0 else 0 %}
                     <div class="progress-bar bg-primary" role="progressbar" 
                          {% if progress_percentage > 100 %}
                          style="width: 100%"

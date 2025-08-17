@@ -153,7 +153,7 @@ def index():
                 note = "Associate: own hours commission"
             elif emp.role.lower() == 'director':
                 direct_comm = revenue * (staff.commission_percentage or 0) / 100
-                override_comm = total_project_revenue * 0.02
+                override_comm = (total_project_revenue * employee.override_percentage / 100) if employee.override_percentage else 0
                 note = "Director: direct + 2% override"
             else:
                 direct_comm = total_project_revenue * (staff.commission_percentage or 0) / 100
@@ -253,7 +253,7 @@ def dashboard():
                 override_comm = 0
             elif employee.role.lower() == 'director':
                 direct_comm = revenue * (staff.commission_percentage or 0) / 100
-                override_comm = total_project_revenue * 0.02
+                override_comm = (total_project_revenue * employee.override_percentage / 100) if employee.override_percentage else 0
             else:
                 direct_comm = total_project_revenue * (staff.commission_percentage or 0) / 100
                 override_comm = 0
@@ -325,6 +325,7 @@ def projects_new():
             start_date=form.start_date.data,
             end_date=form.end_date.data,
             total_allocated_hours=form.total_allocated_hours.data,
+            extra_hours=form.extra_hours.data,
             company_id=current_user.company_id
         )
         db.session.add(project)
@@ -401,6 +402,7 @@ def employees_new():
             name=form.name.data,
             role=form.role.data,
             hourly_rate=form.hourly_rate.data,
+            override_percentage=form.override_percentage.data if form.role.data == 'Director' else 0.0,
             company_id=current_user.company_id
         )
         db.session.add(employee)

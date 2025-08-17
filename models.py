@@ -44,6 +44,7 @@ class Project(db.Model):
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date)
     total_allocated_hours = db.Column(db.Float, nullable=False, default=0.0)
+    extra_hours = db.Column(db.Float, nullable=False, default=0.0)
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -74,13 +75,14 @@ class Project(db.Model):
     
     @property
     def remaining_hours(self):
-        return self.total_allocated_hours - self.total_hours_worked
+        return (self.total_allocated_hours + self.extra_hours) - self.total_hours_worked
 
 class Employee(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     role = db.Column(db.String(50), nullable=False)
     hourly_rate = db.Column(db.Float, nullable=False)
+    override_percentage = db.Column(db.Float, nullable=False, default=0.0)
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -156,7 +158,7 @@ class ProjectStaff(db.Model):
                     total_associate_revenue += revenue
         
         # Director gets 2% override on associate revenue
-        return total_associate_revenue * 0.02
+        return (total_associate_revenue * self.employee.override_percentage / 100) if self.employee.override_percentage else 0
 
 class HoursEntry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -217,7 +219,7 @@ class HoursEntry(db.Model):
                 func.sum(HoursEntry.hours_billed * (Employee.hourly_rate or 0))
             ).scalar() or 0.0
 
-            override_commission = 0.02 * total_revenue
+            override_commission = (total_revenue * employee.override_percentage / 100) if employee.override_percentage else 0
             base_commission += override_commission
 
         else:
