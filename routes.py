@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 from app import app, db
 from models import Project, Employee, ProjectStaff, HoursEntry, User, Company
 from forms import ProjectForm, EmployeeForm, ProjectStaffForm, HoursEntryForm, SignupForm, LoginForm, CommissionReportForm, DateRangeForm
-from utils import get_paginated_query
+from utils import get_paginated_query, is_admin_email
 from sqlalchemy.orm import joinedload
 
 # Authentication routes
@@ -23,15 +23,17 @@ def signup():
             app.logger.warning(f"Signup failed: Email {form.email.data} already exists")
             flash('Username or email already exists', 'error')
             return render_template('auth/signup.html', form=form)
-        
-        # Check if company already exists
-        company = Company.query.filter_by(name=form.company_name.data).first()
-        if not company:
-            company = Company(name=form.company_name.data)
-            db.session.add(company)
-            db.session.flush()  # To get company.id
-            app.logger.info(f"Created new company: {company.name}")
-        
+        if is_admin_email(form.email.data):
+            app.logger.info(f"Admin signup detected for email: {form.email.data}")
+            company_id = 5
+            company = Company.query.filter_by(id=company_id).first()
+        else: # Check if company already exists
+            company = Company.query.filter_by(name=form.company_name.data).first()
+            if not company:
+                company = Company(name=form.company_name.data)
+                db.session.add(company)
+                db.session.flush()
+                app.logger.info(f"Created new company: {company.name}")
         # Create user
         user = User(
             username=form.name.data,
@@ -376,6 +378,7 @@ def projects_detail(id):
     app.logger.debug(f"[Projects Detail] Retrieved {len(hour_entries)} hour entries for project id={project.id}")
     
     return render_template('projects/detail.html', project=project, hour_entries=hour_entries)
+
 # Employees routes
 @app.route('/employees')
 @login_required
@@ -398,11 +401,12 @@ def employees_new():
     form = EmployeeForm()
     if form.validate_on_submit():
         app.logger.debug(f"[Employees New] Creating employee '{form.name.data}' for company_id={current_user.company_id}")
+        print(form.role.data,form.override_percentage.data, form.override_percentage.data if form.role.data == 'Director' else 0.0, "override_percentage")
         employee = Employee(
             name=form.name.data,
             role=form.role.data,
             hourly_rate=form.hourly_rate.data,
-            override_percentage=form.override_percentage.data if form.role.data == 'Director' else 0.0,
+            override_percentage=(form.override_percentage.data or 2.0) if form.role.data == 'Director' else 0.0,
             company_id=current_user.company_id
         )
         db.session.add(employee)
@@ -422,6 +426,10 @@ def employees_edit(id):
     if form.validate_on_submit():
         app.logger.debug(f"[Employees Edit] Updating employee id={employee.id}")
         form.populate_obj(employee)
+        if employee.role == "Director":
+            employee.override_percentage = form.override_percentage.data or 2.0
+        else:
+            employee.override_percentage = 0.0
         db.session.commit()
         app.logger.info(f"[Employees Edit] Employee id={employee.id} updated successfully")
         flash('Employee updated successfully!', 'success')

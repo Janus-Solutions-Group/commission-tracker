@@ -23,7 +23,7 @@ class ProjectForm(FlaskForm):
     start_date = DateField('Start Date', validators=[DataRequired()])
     end_date = DateField('End Date', validators=[Optional()]) 
     total_allocated_hours = FloatField('Total Allocated Hours', validators=[DataRequired(), NumberRange(min=0.01, max=10000)])
-    extra_hours = FloatField('Extra Hours', default=0.0, validators=[DataRequired(), NumberRange(min=0.01, max=10000)])
+    extra_hours = FloatField('Extra Hours', default=0.0, validators=[NumberRange(min=0, max=10000)])
     
     # def validate_end_date(self, field):
     #     if field.data and self.start_date.data and field.data < self.start_date.data:
@@ -43,7 +43,7 @@ class EmployeeForm(FlaskForm):
         validators=[DataRequired()]
     )
     hourly_rate = FloatField('Hourly Rate ($)', validators=[DataRequired(), NumberRange(min=0.01, max=10000)])
-    override_percentage = FloatField('Override Percentage (%)', default=2.0, validators=[DataRequired(), NumberRange(min=0, max=100)])
+    override_percentage = FloatField('Override Percentage (%)', default=2.0, validators=[NumberRange(min=0, max=100)])
 
 class ProjectStaffForm(FlaskForm):
     employee_id = SelectField('Employee', coerce=int, validators=[DataRequired()])

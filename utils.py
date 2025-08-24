@@ -31,3 +31,11 @@ def register_template_filters(app):
     app.jinja_env.filters['currency'] = format_currency
     app.jinja_env.filters['hours'] = format_hours
     app.jinja_env.filters['efficiency'] = calculate_efficiency
+
+def is_admin_email(email):
+    allowed_domains = [
+        "@corpbizadvisors.com",
+        "@biz-solve.com",
+        "@blujaxaccountants.com"
+    ]
+    return any(email.lower().endswith(domain) for domain in allowed_domains)
