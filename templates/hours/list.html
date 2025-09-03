@@ -55,7 +55,7 @@
                             <td class="text-end">
                                 {% set efficiency = (entry.hours_billed / entry.hours_worked * 100) if entry.hours_worked > 0 else 0 %}
                                 <span class="badge {% if efficiency >= 90 %}bg-success{% elif efficiency >= 70 %}bg-warning{% else %}bg-danger{% endif %}">
-                                    {{ "%.1f"|format(efficiency) }}%
+                                    {{ "%.2f"|format(efficiency) }}%
                                 </span>
                             </td>
                             <td class="text-end">

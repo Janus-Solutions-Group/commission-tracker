@@ -42,7 +42,7 @@
                             <td class="text-center">
                                 <span class="badge bg-primary">{{ assignment.employee.role }}</span>
                             </td>
-                            <td class="text-end">{{ "%.1f"|format(assignment.commission_percentage) }}%</td>
+                            <td class="text-end">{{ "%.2f"|format(assignment.commission_percentage) }}%</td>
                             <td class="text-center">
                                 <div class="btn-group btn-group-sm">
                                     <a href="{{ url_for('project_staff_edit', id=assignment.id) }}" class="btn btn-outline-secondary">

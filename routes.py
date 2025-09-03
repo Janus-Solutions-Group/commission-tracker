@@ -579,6 +579,8 @@ def hours_edit(id):
 @app.route('/hours/<int:id>/delete', methods=['POST'])
 @login_required
 def hours_delete(id):
+    redirect_back = request.args.get("redirect", "0") == "1"
+    print(redirect_back)
     app.logger.info(f"[Hours Delete] Deleting hours entry id={id} for company_id={current_user.company_id}")
     hours_entry = HoursEntry.query.join(Project).filter(
         HoursEntry.id == id, 
@@ -588,8 +590,11 @@ def hours_delete(id):
     db.session.commit()
     app.logger.info(f"[Hours Delete] Hours entry id={id} deleted successfully")
     flash('Hours entry deleted successfully!', 'success')
-    return redirect(url_for('hours_list'))
-
+    if redirect_back:
+        return redirect(url_for('hours_list'))
+    else:
+        return redirect(url_for('projects_detail', id=hours_entry.project_id))
+    
 # Error handlers
 @app.errorhandler(404)
 def not_found(error):

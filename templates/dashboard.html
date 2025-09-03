@@ -177,7 +177,7 @@
                                 <td class="text-center">
                                     {% set efficiency = ((d.billed or 0) / (d.worked or 1) * 100) %}
                                     <span class="badge {% if efficiency >= 90 %}bg-success{% elif efficiency >= 70 %}bg-warning{% else %}bg-danger{% endif %}">
-                                        {{ "%.1f"|format(efficiency) }}%
+                                        {{ "%.2f"|format(efficiency) }}%
                                     </span>
                                 </td>
                                 <td class="text-end">${{ "%.2f"|format(d.revenue or 0) }}</td>
@@ -258,7 +258,7 @@
                                 <td class="text-center">
                                     {% set efficiency = ((billed or 0) / (worked or 1) * 100) if worked else 0 %}
                                     <span class="badge {% if efficiency >= 90 %}bg-success{% elif efficiency >= 70 %}bg-warning{% else %}bg-danger{% endif %}">
-                                        {{ "%.1f"|format(efficiency) }}%
+                                        {{ "%.2f"|format(efficiency) }}%
                                     </span>
                                 </td>
                                 <td class="text-end"><strong>${{ "%.2f"|format(revenue or 0) }}</strong></td>
@@ -279,7 +279,7 @@
                                     {% set total_billed = project_stats|sum(attribute=2) or 0 %}
                                     {% set total_efficiency = (total_billed / total_worked * 100) if total_worked > 0 else 0 %}
                                     <span class="badge {% if total_efficiency >= 90 %}bg-success{% elif total_efficiency >= 70 %}bg-warning{% else %}bg-danger{% endif %}">
-                                        {{ "%.1f"|format(total_efficiency) }}%
+                                        {{ "%.2f"|format(total_efficiency) }}%
                                     </span>
                                 </th>
                                 <th class="text-end"><strong>${{ "%.2f"|format(project_stats|sum(attribute=3) or 0) }}</strong></th>

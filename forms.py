@@ -48,7 +48,7 @@ class EmployeeForm(FlaskForm):
 class ProjectStaffForm(FlaskForm):
     employee_id = SelectField('Employee', coerce=int, validators=[DataRequired()])
     project_id = SelectField('Project', coerce=int, validators=[DataRequired()])
-    commission_percentage = FloatField('Commission Percentage (%)', validators=[DataRequired(), NumberRange(min=0, max=100)])
+    commission_percentage = FloatField('Commission Percentage (%)', validators=[NumberRange(min=0, max=100)])
     
     def __init__(self, *args, **kwargs):
         super(ProjectStaffForm, self).__init__(*args, **kwargs)

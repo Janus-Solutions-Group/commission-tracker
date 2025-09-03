@@ -48,12 +48,12 @@
                                 </a>
                             </td>
                             <td>{{ project.client }}</td>
-                            <td class="text-end">{{ "%.1f"|format(project.total_allocated_hours) }}</td>
-                            <td class="text-end">{{ "%.1f"|format(project.extra_hours) }}</td>
-                            <td class="text-end">{{ "%.1f"|format(project.total_hours_worked) }}</td>
+                            <td class="text-end">{{ "%.2f"|format(project.total_allocated_hours) }}</td>
+                            <td class="text-end">{{ "%.2f"|format(project.extra_hours) }}</td>
+                            <td class="text-end">{{ "%.2f"|format(project.total_hours_worked) }}</td>
                             <td class="text-end">
                                 <span class="{% if project.remaining_hours < 0 %}text-danger{% else %}text-success{% endif %}">
-                                    {{ "%.1f"|format(project.remaining_hours) }}
+                                    {{ "%.2f"|format(project.remaining_hours) }}
                                 </span>
                             </td>
                             <td class="text-end">${{ "%.2f"|format(project.total_revenue) }}</td>
