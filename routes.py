@@ -6,7 +6,7 @@ from models import Project, Employee, ProjectStaff, HoursEntry, User, Company
 from forms import ProjectForm, EmployeeForm, ProjectStaffForm, HoursEntryForm, SignupForm, LoginForm, CommissionReportForm, DateRangeForm
 from utils import get_paginated_query, is_admin_email
 from sqlalchemy.orm import joinedload
-
+from sqlalchemy.exc import IntegrityError
 # Authentication routes
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -448,6 +448,12 @@ def employees_delete(id):
     flash('Employee deleted successfully!', 'success')
     return redirect(url_for('employees_list'))
 
+@app.route("/employees/<int:id>/rate")
+@login_required
+def get_employee_rate(id):
+    employee = Employee.query.filter_by(id=id, company_id=current_user.company_id).first_or_404()
+    return {"hourly_rate": employee.hourly_rate}
+
 # Project Staff routes
 @app.route('/project-staff')
 @login_required
@@ -469,18 +475,24 @@ def project_staff_new():
     app.logger.info(f"[ProjectStaff New] Request method={request.method}")
     form = ProjectStaffForm()
     if form.validate_on_submit():
-        app.logger.debug(f"[ProjectStaff New] Assigning employee_id={form.employee_id.data} to project_id={form.project_id.data}")
-        project_staff = ProjectStaff(
-            company_id=current_user.company_id,
-            employee_id=form.employee_id.data,
-            project_id=form.project_id.data,
-            commission_percentage=form.commission_percentage.data,
-        )
-        db.session.add(project_staff)
-        db.session.commit()
-        app.logger.info(f"[ProjectStaff New] Assignment created with id={project_staff.id}")
-        flash('Employee assigned to project successfully!', 'success')
-        return redirect(url_for('project_staff_list'))
+        try:
+            app.logger.debug(f"[ProjectStaff New] Assigning employee_id={form.employee_id.data} to project_id={form.project_id.data}")
+            project_staff = ProjectStaff(
+                company_id=current_user.company_id,
+                employee_id=form.employee_id.data,
+                project_id=form.project_id.data,
+                hourly_rate=form.hourly_rate.data,
+                commission_percentage=form.commission_percentage.data,
+            )
+            db.session.add(project_staff)
+            db.session.commit()
+            app.logger.info(f"[ProjectStaff New] Assignment created with id={project_staff.id}")
+            flash('Employee assigned to project successfully!', 'success')
+            return redirect(url_for('project_staff_list'))
+        except IntegrityError as e:
+            db.session.rollback()
+            app.logger.warning(f"[ProjectStaff New] IntegrityError: {str(e)}")
+            flash('This employee is already assigned to the selected project.', 'error')
     return render_template('project_staff/form.html', form=form, title='Assign Employee to Project')
 
 
@@ -494,12 +506,17 @@ def project_staff_edit(id):
     ).first_or_404()
     form = ProjectStaffForm(obj=project_staff)
     if form.validate_on_submit():
-        app.logger.debug(f"[ProjectStaff Edit] Updating assignment id={project_staff.id}")
-        form.populate_obj(project_staff)
-        db.session.commit()
-        app.logger.info(f"[ProjectStaff Edit] Assignment id={project_staff.id} updated successfully")
-        flash('Project assignment updated successfully!', 'success')
-        return redirect(url_for('project_staff_list'))
+        try:
+            app.logger.debug(f"[ProjectStaff Edit] Updating assignment id={project_staff.id}")
+            form.populate_obj(project_staff)
+            db.session.commit()
+            app.logger.info(f"[ProjectStaff Edit] Assignment id={project_staff.id} updated successfully")
+            flash('Project assignment updated successfully!', 'success')
+            return redirect(url_for('project_staff_list'))
+        except IntegrityError as e:
+            db.session.rollback()
+            app.logger.warning(f"[ProjectStaff New] IntegrityError: {str(e)}")
+            flash('This employee is already assigned to the selected project.', 'error')
     return render_template('project_staff/form.html', form=form, title='Edit Project Assignment', project_staff=project_staff)
 
 

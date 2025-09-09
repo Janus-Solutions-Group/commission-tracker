@@ -122,12 +122,14 @@ class ProjectStaff(db.Model):
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
     commission_percentage = db.Column(db.Float, nullable=False, default=0.0)
+    hourly_rate = db.Column(db.Float, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
 
     # Unique constraint to prevent duplicate assignments
-    __table_args__ = (db.UniqueConstraint('employee_id', 'project_id', name='unique_employee_project'),)
+    __table_args__ = (db.UniqueConstraint('employee_id', 'project_id', 'hourly_rate', name='unique_employee_project_hourly_rate'),)
     
+
     def __repr__(self):
         return f'<ProjectStaff {self.id}>'
     

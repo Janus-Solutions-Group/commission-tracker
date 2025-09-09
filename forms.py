@@ -49,7 +49,8 @@ class ProjectStaffForm(FlaskForm):
     employee_id = SelectField('Employee', coerce=int, validators=[DataRequired()])
     project_id = SelectField('Project', coerce=int, validators=[DataRequired()])
     commission_percentage = FloatField('Commission Percentage (%)', validators=[NumberRange(min=0, max=100)])
-    
+    hourly_rate = FloatField('Hourly Rate ($)', validators=[DataRequired(), NumberRange(min=0.01, max=10000)])
+
     def __init__(self, *args, **kwargs):
         super(ProjectStaffForm, self).__init__(*args, **kwargs)
         from flask_login import current_user

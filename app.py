@@ -39,6 +39,7 @@ database = "postgres"
 encoded_password = quote_plus(password)
 # Assemble SQLAlchemy database URL
 database_url = os.environ.get("DATABASE_URL",f"postgresql+psycopg2://{username}:{encoded_password}@{host}:{port}/{database}")
+print(database_url)
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,

@@ -3,6 +3,36 @@
 {% block title %}{{ title }} - Commission Tracker{% endblock %}
 
 {% block content %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const employeeSelect = document.querySelector("#employee_id");
+    const hourlyRateInput = document.querySelector("#hourly_rate");
+
+    function fetchEmployeeRate(empId) {
+        if (!empId) return;
+        fetch(`/employees/${empId}/rate`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.hourly_rate !== undefined) {
+                    hourlyRateInput.value = data.hourly_rate;
+                }
+            });
+    }
+
+    if (employeeSelect && hourlyRateInput) {
+        // Auto-fetch on change
+        employeeSelect.addEventListener("change", function() {
+            fetchEmployeeRate(this.value);
+        });
+
+        // ✅ Also fetch on first page load (for default/pre-selected employee)
+        if (employeeSelect.value && (!hourlyRateInput.value || parseFloat(hourlyRateInput.value) === 0)) {
+            fetchEmployeeRate(employeeSelect.value);
+        }
+    }
+});
+</script>
+
 <div class="row">
     <div class="col-md-8 mx-auto">
         <div class="card">
@@ -41,7 +71,7 @@
                     </div>
 
                     <div class="row">
-                        <div class="col-md-8">
+                        <div class="col-md-6">
                             <div class="mb-3">
                                 {{ form.commission_percentage.label(class="form-label") }}
                                 <div class="input-group">
@@ -56,6 +86,24 @@
                                     {% endif %}
                                 </div>
                                 <div class="form-text">Set the commission percentage for this employee on this project</div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.hourly_rate.label(class="form-label") }}
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    {{ form.hourly_rate(class="form-control" + (" is-invalid" if form.hourly_rate.errors else ""), step="0.1") }}
+                                    {% if form.hourly_rate.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.hourly_rate.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="form-text">Hourly rate of the employee on this project. It takes hourly rate set for this employee by default and you can change at the project level.</div>
                             </div>
                         </div>
                     </div>
