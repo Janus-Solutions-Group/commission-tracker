@@ -136,10 +136,10 @@ def index():
 
             emp = staff.employee
             hours = sum(e.hours_worked for e in hours_entries)
-            revenue = hours * (emp.hourly_rate or 0)
+            revenue = hours * (staff.hourly_rate or 0)
             
             total_project_revenue = sum(
-                he.hours_worked * (staff_map.get(he.employee_id).employee.hourly_rate or 0)
+                he.hours_worked * (staff_map.get(he.employee_id).hourly_rate or 0)
                 for he in HoursEntry.query.filter(
                     HoursEntry.project_id == project.id,
                     HoursEntry.date >= date_from,
@@ -173,7 +173,7 @@ def index():
                 "project_number": project.project_id,
                 "project_name": project.name,
                 "hours_billed": hours,
-                "bill_rate": emp.hourly_rate or 0,
+                "bill_rate": staff.hourly_rate or 0,
                 "direct_commission": direct_comm,
                 "override_commission": override_comm,
                 "total_commission": direct_comm + override_comm,
@@ -240,7 +240,7 @@ def dashboard():
                 continue
 
             emp_hours[entry.employee_id] = emp_hours.get(entry.employee_id, 0) + entry.hours_worked
-            revenue = entry.hours_worked * (staff.employee.hourly_rate or 0)
+            revenue = entry.hours_worked * (staff.hourly_rate or 0)
             emp_revenue[entry.employee_id] = emp_revenue.get(entry.employee_id, 0) + revenue
             total_project_revenue += revenue
 
