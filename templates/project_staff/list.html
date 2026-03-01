@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/table_controls.html" import search_bar, sort_header %}
 
 {% block title %}Project Assignments - Commission Tracker{% endblock %}
 
@@ -22,16 +23,18 @@
 
 <div class="card">
     <div class="card-body">
+        {{ search_bar('project_staff_list', search) }}
+
         {% if project_staff.items %}
             <div class="table-responsive">
                 <table class="table table-striped align-middle">
                     <thead>
                         <tr>
-                            <th>Employee</th>
-                            <th>Project</th>
+                            {{ sort_header('Employee', 'employee', sort, order, search) }}
+                            {{ sort_header('Project', 'project', sort, order, search) }}
                             <th class="text-center">Role on Project</th>
-                            <th class="text-end">Hourly Rate</th>
-                            <th class="text-end">Commission %</th>
+                            {{ sort_header('Hourly Rate', 'hourly_rate', sort, order, search, align='end') }}
+                            {{ sort_header('Commission %', 'commission_percentage', sort, order, search, align='end') }}
                             <th class="text-center">Actions</th>
                         </tr>
                     </thead>
@@ -50,7 +53,7 @@
                                     <a href="{{ url_for('project_staff_edit', id=assignment.id) }}" class="btn btn-outline-secondary">
                                         <i data-feather="edit-2"></i>
                                     </a>
-                                    <form method="POST" action="{{ url_for('project_staff_delete', id=assignment.id) }}" class="d-inline" 
+                                    <form method="POST" action="{{ url_for('project_staff_delete', id=assignment.id) }}" class="d-inline"
                                           onsubmit="return confirm('Are you sure you want to remove this assignment?')">
                                         <button type="submit" class="btn btn-outline-danger">
                                             <i data-feather="trash-2"></i>
@@ -65,6 +68,13 @@
             </div>
 
             {% include 'components/pagination.html' %}
+        {% elif search %}
+            <div class="text-center py-5">
+                <i data-feather="search" style="width: 64px; height: 64px;" class="text-muted mb-3"></i>
+                <h4 class="text-muted">No results found</h4>
+                <p class="text-muted">No assignments match "{{ search }}". Try a different search term.</p>
+                <a href="{{ url_for('project_staff_list') }}" class="btn btn-outline-primary">Clear Search</a>
+            </div>
         {% else %}
             <div class="text-center py-5">
                 <i data-feather="user-plus" style="width: 64px; height: 64px;" class="text-muted mb-3"></i>

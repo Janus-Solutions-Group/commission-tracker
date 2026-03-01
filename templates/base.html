@@ -584,6 +584,38 @@
         ::-webkit-scrollbar-thumb:hover {
             background: var(--secondary);
         }
+
+        /* Sortable table headers */
+        .sortable-header a {
+            text-decoration: none;
+            color: inherit;
+            cursor: pointer;
+        }
+
+        .sortable-header a:hover {
+            color: var(--primary);
+        }
+
+        .sort-icon {
+            width: 14px !important;
+            height: 14px !important;
+        }
+
+        /* Client-side sortable headers for report pages */
+        th[data-sortable] {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        th[data-sortable]:hover {
+            color: var(--primary);
+        }
+
+        th[data-sortable] .sort-indicator {
+            font-size: 0.65em;
+            vertical-align: middle;
+            margin-left: 2px;
+        }
     </style>
 </head>
 <body>

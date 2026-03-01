@@ -5,8 +5,9 @@ from app import app, db
 from models import Project, Employee, ProjectStaff, HoursEntry, User, Company
 from forms import ProjectForm, EmployeeForm, ProjectStaffForm, HoursEntryForm, SignupForm, LoginForm, CommissionReportForm, DateRangeForm
 from utils import get_paginated_query, is_admin_email
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, subqueryload, contains_eager
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import or_, func, and_
 # Authentication routes
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -304,13 +305,55 @@ def dashboard():
 def projects_list():
     page = request.args.get('page', 1, type=int)
     per_page = 10
-    app.logger.info(f"[Projects List] Fetching projects for company_id={current_user.company_id}, page={page}")
-    projects = get_paginated_query(
-        Project.query.filter_by(company_id=current_user.company_id).order_by(Project.name), 
-        page, per_page
-    )
+    search = request.args.get('search', '', type=str).strip()
+    sort = request.args.get('sort', 'name', type=str)
+    order = request.args.get('order', 'asc', type=str)
+
+    app.logger.info(f"[Projects List] Fetching projects for company_id={current_user.company_id}, page={page}, search={search}, sort={sort}, order={order}")
+
+    query = Project.query.filter_by(company_id=current_user.company_id)
+
+    if search:
+        query = query.filter(or_(
+            Project.name.ilike(f'%{search}%'),
+            Project.client.ilike(f'%{search}%'),
+            Project.project_id.ilike(f'%{search}%'),
+        ))
+
+    sort_columns = {
+        'name': Project.name,
+        'client': Project.client,
+        'project_id': Project.project_id,
+        'allocated_hours': Project.total_allocated_hours,
+        'extra_hours': Project.extra_hours,
+    }
+    sort_col = sort_columns.get(sort, Project.name)
+    query = query.order_by(sort_col.desc() if order == 'desc' else sort_col.asc())
+
+    projects = get_paginated_query(query, page, per_page)
+
+    # Batch pre-compute hours_worked and revenue to avoid N+1
+    if projects.items:
+        project_ids = [p.id for p in projects.items]
+
+        hours_stats = db.session.query(
+            HoursEntry.project_id,
+            func.coalesce(func.sum(HoursEntry.hours_worked), 0),
+        ).filter(HoursEntry.project_id.in_(project_ids)).group_by(HoursEntry.project_id).all()
+        hours_map = {row[0]: row[1] for row in hours_stats}
+
+        revenue_stats = db.session.query(
+            HoursEntry.project_id,
+            func.coalesce(func.sum(HoursEntry.hours_billed * Employee.hourly_rate), 0),
+        ).join(Employee).filter(HoursEntry.project_id.in_(project_ids)).group_by(HoursEntry.project_id).all()
+        revenue_map = {row[0]: row[1] for row in revenue_stats}
+
+        for p in projects.items:
+            p._prefetched_hours_worked = hours_map.get(p.id, 0)
+            p._prefetched_revenue = revenue_map.get(p.id, 0)
+
     app.logger.debug(f"[Projects List] Retrieved {len(projects.items)} projects on page {page}")
-    return render_template('projects/list.html', projects=projects)
+    return render_template('projects/list.html', projects=projects, search=search, sort=sort, order=order)
 
 
 @app.route('/projects/new', methods=['GET', 'POST'])
@@ -371,12 +414,27 @@ def projects_delete(id):
 def projects_detail(id):
     app.logger.info(f"[Projects Detail] Fetching details for project id={id} (company_id={current_user.company_id})")
     project = Project.query.filter_by(id=id, company_id=current_user.company_id).first_or_404()
-    
-    hour_entries = HoursEntry.query.filter_by(project_id=project.id).order_by(
+
+    hour_entries = HoursEntry.query.options(
+        joinedload(HoursEntry.employee),
+    ).filter_by(project_id=project.id).order_by(
         HoursEntry.date.desc(), HoursEntry.created_at.desc()
     ).all()
+
+    # Pre-fetch ProjectStaff for commission_earned to avoid N+1
+    if hour_entries:
+        pairs = set((e.employee_id, e.project_id) for e in hour_entries)
+        pair_filters = [
+            and_(ProjectStaff.employee_id == eid, ProjectStaff.project_id == pid)
+            for eid, pid in pairs
+        ]
+        all_staff = ProjectStaff.query.filter(or_(*pair_filters)).all() if pair_filters else []
+        staff_map = {(s.employee_id, s.project_id): s for s in all_staff}
+        for entry in hour_entries:
+            entry._prefetched_project_staff = staff_map.get((entry.employee_id, entry.project_id))
+
     app.logger.debug(f"[Projects Detail] Retrieved {len(hour_entries)} hour entries for project id={project.id}")
-    
+
     return render_template('projects/detail.html', project=project, hour_entries=hour_entries)
 
 # Employees routes
@@ -385,13 +443,47 @@ def projects_detail(id):
 def employees_list():
     page = request.args.get('page', 1, type=int)
     per_page = 10
-    app.logger.info(f"[Employees List] Fetching employees for company_id={current_user.company_id}, page={page}")
-    employees = get_paginated_query(
-        Employee.query.filter_by(company_id=current_user.company_id).order_by(Employee.name), 
-        page, per_page
-    )
+    search = request.args.get('search', '', type=str).strip()
+    sort = request.args.get('sort', 'name', type=str)
+    order = request.args.get('order', 'asc', type=str)
+
+    app.logger.info(f"[Employees List] Fetching employees for company_id={current_user.company_id}, page={page}, search={search}, sort={sort}, order={order}")
+
+    query = Employee.query.options(
+        subqueryload(Employee.project_staff),
+    ).filter_by(company_id=current_user.company_id)
+
+    if search:
+        query = query.filter(or_(
+            Employee.name.ilike(f'%{search}%'),
+            Employee.role.ilike(f'%{search}%'),
+        ))
+
+    sort_columns = {
+        'name': Employee.name,
+        'role': Employee.role,
+        'hourly_rate': Employee.hourly_rate,
+        'override_percentage': Employee.override_percentage,
+    }
+    sort_col = sort_columns.get(sort, Employee.name)
+    query = query.order_by(sort_col.desc() if order == 'desc' else sort_col.asc())
+
+    employees = get_paginated_query(query, page, per_page)
+
+    # Batch pre-compute total_hours_worked to avoid N+1
+    if employees.items:
+        emp_ids = [e.id for e in employees.items]
+        hours_stats = db.session.query(
+            HoursEntry.employee_id,
+            func.coalesce(func.sum(HoursEntry.hours_worked), 0),
+        ).filter(HoursEntry.employee_id.in_(emp_ids)).group_by(HoursEntry.employee_id).all()
+        hours_map = {row[0]: row[1] for row in hours_stats}
+
+        for e in employees.items:
+            e._prefetched_hours_worked = hours_map.get(e.id, 0)
+
     app.logger.debug(f"[Employees List] Retrieved {len(employees.items)} employees on page {page}")
-    return render_template('employees/list.html', employees=employees)
+    return render_template('employees/list.html', employees=employees, search=search, sort=sort, order=order)
 
 
 @app.route('/employees/new', methods=['GET', 'POST'])
@@ -460,13 +552,36 @@ def get_employee_rate(id):
 def project_staff_list():
     page = request.args.get('page', 1, type=int)
     per_page = 10
-    app.logger.info(f"[ProjectStaff List] Fetching for company_id={current_user.company_id}, page={page}")
-    project_staff = get_paginated_query(
-        ProjectStaff.query.join(Project).filter(Project.company_id == current_user.company_id).order_by(ProjectStaff.created_at.desc()), 
-        page, per_page
-    )
+    search = request.args.get('search', '', type=str).strip()
+    sort = request.args.get('sort', 'created_at', type=str)
+    order = request.args.get('order', 'desc', type=str)
+
+    app.logger.info(f"[ProjectStaff List] Fetching for company_id={current_user.company_id}, page={page}, search={search}, sort={sort}, order={order}")
+
+    query = ProjectStaff.query.join(Project).join(Employee).options(
+        contains_eager(ProjectStaff.project),
+        contains_eager(ProjectStaff.employee),
+    ).filter(Project.company_id == current_user.company_id)
+
+    if search:
+        query = query.filter(or_(
+            Employee.name.ilike(f'%{search}%'),
+            Project.name.ilike(f'%{search}%'),
+        ))
+
+    sort_columns = {
+        'employee': Employee.name,
+        'project': Project.name,
+        'hourly_rate': ProjectStaff.hourly_rate,
+        'commission_percentage': ProjectStaff.commission_percentage,
+        'created_at': ProjectStaff.created_at,
+    }
+    sort_col = sort_columns.get(sort, ProjectStaff.created_at)
+    query = query.order_by(sort_col.desc() if order == 'desc' else sort_col.asc())
+
+    project_staff = get_paginated_query(query, page, per_page)
     app.logger.debug(f"[ProjectStaff List] Retrieved {len(project_staff.items)} assignments on page {page}")
-    return render_template('project_staff/list.html', project_staff=project_staff)
+    return render_template('project_staff/list.html', project_staff=project_staff, search=search, sort=sort, order=order)
 
 
 @app.route('/project-staff/new', methods=['GET', 'POST'])
@@ -541,13 +656,49 @@ def project_staff_delete(id):
 def hours_list():
     page = request.args.get('page', 1, type=int)
     per_page = 10
-    app.logger.info(f"[Hours List] Fetching hours for company_id={current_user.company_id}, page={page}")
-    hours = get_paginated_query(
-        HoursEntry.query.join(Project).filter(Project.company_id == current_user.company_id).order_by(HoursEntry.date.desc()), 
-        page, per_page
-    )
+    search = request.args.get('search', '', type=str).strip()
+    sort = request.args.get('sort', 'date', type=str)
+    order = request.args.get('order', 'desc', type=str)
+
+    app.logger.info(f"[Hours List] Fetching hours for company_id={current_user.company_id}, page={page}, search={search}, sort={sort}, order={order}")
+
+    query = HoursEntry.query.join(Project).join(Employee).options(
+        contains_eager(HoursEntry.project),
+        contains_eager(HoursEntry.employee),
+    ).filter(Project.company_id == current_user.company_id)
+
+    if search:
+        query = query.filter(or_(
+            Employee.name.ilike(f'%{search}%'),
+            Project.name.ilike(f'%{search}%'),
+            HoursEntry.description.ilike(f'%{search}%'),
+        ))
+
+    sort_columns = {
+        'date': HoursEntry.date,
+        'employee': Employee.name,
+        'project': Project.name,
+        'hours_billed': HoursEntry.hours_billed,
+    }
+    sort_col = sort_columns.get(sort, HoursEntry.date)
+    query = query.order_by(sort_col.desc() if order == 'desc' else sort_col.asc())
+
+    hours = get_paginated_query(query, page, per_page)
+
+    # Pre-fetch ProjectStaff for commission_earned to avoid N+1
+    if hours.items:
+        pairs = set((e.employee_id, e.project_id) for e in hours.items)
+        pair_filters = [
+            and_(ProjectStaff.employee_id == eid, ProjectStaff.project_id == pid)
+            for eid, pid in pairs
+        ]
+        all_staff = ProjectStaff.query.filter(or_(*pair_filters)).all() if pair_filters else []
+        staff_map = {(s.employee_id, s.project_id): s for s in all_staff}
+        for entry in hours.items:
+            entry._prefetched_project_staff = staff_map.get((entry.employee_id, entry.project_id))
+
     app.logger.debug(f"[Hours List] Retrieved {len(hours.items)} entries on page {page}")
-    return render_template('hours/list.html', hours=hours)
+    return render_template('hours/list.html', hours=hours, search=search, sort=sort, order=order)
 
 
 @app.route('/hours/new', methods=['GET', 'POST'])

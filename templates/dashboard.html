@@ -6,7 +6,7 @@
 <div class="row mb-4">
     <div class="col">
         <h1 class="d-flex align-items-center">
-            <i data-feather="bar-chart-2" class="me-2"></i> 
+            <i data-feather="bar-chart-2" class="me-2"></i>
             Commission Analytics & Performance Dashboard
         </h1>
         <p class="text-muted">
@@ -49,15 +49,30 @@
             </div>
             <div class="card-body">
             {% if report_data %}
+            <div class="mb-3">
+                <div class="row g-2 align-items-center">
+                    <div class="col-md-4">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0">
+                                <i data-feather="search" style="width: 16px; height: 16px;"></i>
+                            </span>
+                            <input type="text" id="dashboardSearch" class="form-control border-start-0"
+                                   placeholder="Filter employees..." style="padding: 0.5rem 0.75rem;">
+                        </div>
+                    </div>
+                    <div class="col text-end">
+                        <small class="text-muted">Click on a column header to sort</small>
+                    </div>
+                </div>
+            </div>
             <div class="table-responsive">
-                <table class="table table-bordered table-striped align-middle">
+                <table class="table table-bordered table-striped align-middle" id="dashboardTable">
                     <thead class="table-dark">
                         <tr>
-                            <th>Employee</th>
-                            <th class="text-end">Hours</th>
-                            <th class="text-end">Revenue</th>
-                            <th class="text-end">Commission</th>
-                            <!-- <th class="text-end">Actions</th> -->
+                            <th data-sortable data-sort-type="text">Employee <span class="sort-indicator"></span></th>
+                            <th class="text-end" data-sortable data-sort-type="number">Hours <span class="sort-indicator"></span></th>
+                            <th class="text-end" data-sortable data-sort-type="number">Revenue <span class="sort-indicator"></span></th>
+                            <th class="text-end" data-sortable data-sort-type="number">Commission <span class="sort-indicator"></span></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -70,11 +85,6 @@
                             <td class="text-end">{{ "%.2f"|format(entry.total_hours) }}</td>
                             <td class="text-end">${{ "%.2f"|format(entry.total_revenue) }}</td>
                             <td class="text-end text-success">${{ "%.2f"|format(entry.total_commission) }}</td>
-                            <!-- <td class="text-center">
-                                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modal{{ entry.employee.id }}">
-                                    View Breakdown
-                                </button>
-                            </td> -->
                         </tr>
                         {% endfor %}
             </tbody>
@@ -143,160 +153,60 @@
     </div>
 </div>
 
+{% endblock %}
 
-<!-- Director Performance -->
-<!-- <div class="row mb-5">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i data-feather="users"></i>
-                    Director Performance
-                </h5>
-            </div>
-            <div class="card-body">
-                {% if director_stats %}
-                <div class="table-responsive">
-                    <table class="table table-striped align-middle">
-                        <thead>
-                            <tr>
-                                <th>Director</th>
-                                <th class="text-end">Worked</th>
-                                <th class="text-end">Billed</th>
-                                <th class="text-center">Efficiency</th>
-                                <th class="text-end">Revenue</th>
-                                <th class="text-end">Team Commission</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for d in director_stats %}
-                            <tr>
-                                <td><strong>{{ d.director.name }}</strong></td>
-                                <td class="text-end">{{ "%.2f"|format(d.worked or 0) }}</td>
-                                <td class="text-end">{{ "%.2f"|format(d.billed or 0) }}</td>
-                                <td class="text-center">
-                                    {% set efficiency = ((d.billed or 0) / (d.worked or 1) * 100) %}
-                                    <span class="badge {% if efficiency >= 90 %}bg-success{% elif efficiency >= 70 %}bg-warning{% else %}bg-danger{% endif %}">
-                                        {{ "%.2f"|format(efficiency) }}%
-                                    </span>
-                                </td>
-                                <td class="text-end">${{ "%.2f"|format(d.revenue or 0) }}</td>
-                                <td class="text-end text-success">${{ "%.2f"|format(d.commission or 0) }}</td>
-                            </tr>
-                            {% endfor %}
-                            <tfoot class="table-light fw-bold">
-                                <tr>
-                                    <td>Total</td>
-                                    <td class="text-end">{{ "%.2f"|format(director_stats | sum(attribute='worked')) }}</td>
-                                    <td class="text-end">{{ "%.2f"|format(director_stats | sum(attribute='billed')) }}</td>
-                                    <td class="text-center"></td>
-                                    <td class="text-end">${{ "%.2f"|format(director_stats | sum(attribute='revenue')) }}</td>
-                                    <td class="text-end text-success">${{ "%.2f"|format(director_stats | sum(attribute='commission')) }}</td>
-                                </tr>
-                            </tfoot>
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Client-side search
+    var searchInput = document.getElementById('dashboardSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            var term = this.value.toLowerCase();
+            var table = document.getElementById('dashboardTable');
+            var rows = table.querySelectorAll('tbody tr');
+            rows.forEach(function(row) {
+                var text = row.textContent.toLowerCase();
+                row.style.display = text.includes(term) ? '' : 'none';
+            });
+        });
+    }
 
-                        </tbody>
-                    </table>
-                </div>
+    // Client-side sort (only sort tbody, leave tfoot alone)
+    var sortableHeaders = document.querySelectorAll('#dashboardTable th[data-sortable]');
+    var currentSort = { col: -1, asc: true };
 
+    sortableHeaders.forEach(function(th) {
+        th.addEventListener('click', function() {
+            var table = th.closest('table');
+            var tbody = table.querySelector('tbody');
+            var rows = Array.from(tbody.querySelectorAll('tr'));
+            var colIndex = Array.from(th.parentNode.children).indexOf(th);
+            var sortType = th.getAttribute('data-sort-type');
 
-                {% else %}
-                    <div class="text-center py-4">
-                        <i data-feather="users" style="width: 48px; height: 48px;" class="text-muted mb-3"></i>
-                        <h5 class="text-muted">No director data available</h5>
-                        <p class="text-muted">Add directors and hours entries to see performance metrics.</p>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div> -->
+            var asc = (currentSort.col === colIndex) ? !currentSort.asc : true;
+            currentSort = { col: colIndex, asc: asc };
 
+            rows.sort(function(a, b) {
+                var aVal = a.children[colIndex].textContent.trim();
+                var bVal = b.children[colIndex].textContent.trim();
+                if (sortType === 'number') {
+                    aVal = parseFloat(aVal.replace(/[$,%]/g, '')) || 0;
+                    bVal = parseFloat(bVal.replace(/[$,%]/g, '')) || 0;
+                    return asc ? aVal - bVal : bVal - aVal;
+                }
+                return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+            });
 
-<!-- Project Performance -->
-<!-- <div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i data-feather="folder"></i>
-                    Project Performance
-                </h5>
-            </div>
-            <div class="card-body">
-                {% if project_stats %}
-                <div class="table-responsive">
-                    <table class="table table-striped align-middle">
-                        <thead>
-                            <tr>
-                                <th>Project & Client</th>
-                                <th class="text-center">Status</th>
-                                <th class="text-end">Hours Worked</th>
-                                <th class="text-end">Hours Billed</th>
-                                <th class="text-end">Hours Remaining</th>
-                                <th class="text-center">Efficiency</th>
-                                <th class="text-end">Total Revenue</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for project, worked, billed, revenue in project_stats %}
-                            <tr>
-                                <td>
-                                    <strong>{{ project.name }}</strong><br>
-                                    <span class="text-muted small">{{ project.client }}</span>
-                                </td>
-                                <td class="text-center">
-                                    {% if project.end_date %}
-                                        <span class="badge bg-secondary">Completed</span>
-                                    {% else %}
-                                        <span class="badge bg-success">Active</span>
-                                    {% endif %}
-                                </td>
-                                <td class="text-end">{{ "%.2f"|format(worked or 0) }}</td>
-                                <td class="text-end">{{ "%.2f"|format(billed or 0) }}</td>
-                                <td class="text-end">{{ "%.2f"|format((worked or 0) - (billed or 0)) }}</td>
-                                <td class="text-center">
-                                    {% set efficiency = ((billed or 0) / (worked or 1) * 100) if worked else 0 %}
-                                    <span class="badge {% if efficiency >= 90 %}bg-success{% elif efficiency >= 70 %}bg-warning{% else %}bg-danger{% endif %}">
-                                        {{ "%.2f"|format(efficiency) }}%
-                                    </span>
-                                </td>
-                                <td class="text-end"><strong>${{ "%.2f"|format(revenue or 0) }}</strong></td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                        <tfoot class="table-dark">
-                            <tr>
-                                <th class="text-end"></th>
-                                <th class="text-end"></th>
-                                <th class="text-end">{{ "%.2f"|format(project_stats|sum(attribute=1) or 0) }}</th>
-                                <th class="text-end">{{ "%.2f"|format(project_stats|sum(attribute=2) or 0) }}</th>
-                                <th class="text-end">
-                                    {{ "%.2f"|format((project_stats|sum(attribute=1) or 0) - (project_stats|sum(attribute=2) or 0)) }}
-                                </th>
-                                <th class="text-center">
-                                    {% set total_worked = project_stats|sum(attribute=1) or 0 %}
-                                    {% set total_billed = project_stats|sum(attribute=2) or 0 %}
-                                    {% set total_efficiency = (total_billed / total_worked * 100) if total_worked > 0 else 0 %}
-                                    <span class="badge {% if total_efficiency >= 90 %}bg-success{% elif total_efficiency >= 70 %}bg-warning{% else %}bg-danger{% endif %}">
-                                        {{ "%.2f"|format(total_efficiency) }}%
-                                    </span>
-                                </th>
-                                <th class="text-end"><strong>${{ "%.2f"|format(project_stats|sum(attribute=3) or 0) }}</strong></th>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
+            rows.forEach(function(row) { tbody.appendChild(row); });
 
-                {% else %}
-                    <div class="text-center py-4">
-                        <i data-feather="folder" style="width: 48px; height: 48px;" class="text-muted mb-3"></i>
-                        <h5 class="text-muted">No project data available</h5>
-                        <p class="text-muted">Add projects and hours entries to see project performance.</p>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div> -->
+            // Update indicators
+            sortableHeaders.forEach(function(h) {
+                h.querySelector('.sort-indicator').textContent = '';
+            });
+            th.querySelector('.sort-indicator').textContent = asc ? ' \u25B2' : ' \u25BC';
+        });
+    });
+});
+</script>
 {% endblock %}

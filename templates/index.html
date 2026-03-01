@@ -48,17 +48,33 @@
         </p>
 
         {% if report_data %}
+        <div class="mb-3">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0">
+                            <i data-feather="search" style="width: 16px; height: 16px;"></i>
+                        </span>
+                        <input type="text" id="reportSearch" class="form-control border-start-0"
+                               placeholder="Filter results..." style="padding: 0.5rem 0.75rem;">
+                    </div>
+                </div>
+                <div class="col text-end">
+                    <small class="text-muted">Click on a column header to sort</small>
+                </div>
+            </div>
+        </div>
         <div class="table-responsive">
-            <table class="table table-striped align-middle">
+            <table class="table table-striped align-middle" id="reportTable">
                 <thead>
                     <tr>
-                        <th>Project ID</th>
-                        <th>Project Name</th>
-                        <th class="text-end">Hours Billed</th>
-                        <th class="text-end">Bill Rate</th>
-                        <th class="text-end">Direct Commission</th>
-                        <th class="text-end">Override Commission</th>
-                        <th class="text-end">Total Commission</th>
+                        <th data-sortable data-sort-type="text">Project ID <span class="sort-indicator"></span></th>
+                        <th data-sortable data-sort-type="text">Project Name <span class="sort-indicator"></span></th>
+                        <th class="text-end" data-sortable data-sort-type="number">Hours Billed <span class="sort-indicator"></span></th>
+                        <th class="text-end" data-sortable data-sort-type="number">Bill Rate <span class="sort-indicator"></span></th>
+                        <th class="text-end" data-sortable data-sort-type="number">Direct Commission <span class="sort-indicator"></span></th>
+                        <th class="text-end" data-sortable data-sort-type="number">Override Commission <span class="sort-indicator"></span></th>
+                        <th class="text-end" data-sortable data-sort-type="number">Total Commission <span class="sort-indicator"></span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -87,4 +103,60 @@
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Client-side search
+    var searchInput = document.getElementById('reportSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            var term = this.value.toLowerCase();
+            var table = document.getElementById('reportTable');
+            var rows = table.querySelectorAll('tbody tr');
+            rows.forEach(function(row) {
+                var text = row.textContent.toLowerCase();
+                row.style.display = text.includes(term) ? '' : 'none';
+            });
+        });
+    }
+
+    // Client-side sort
+    var sortableHeaders = document.querySelectorAll('th[data-sortable]');
+    var currentSort = { col: -1, asc: true };
+
+    sortableHeaders.forEach(function(th, index) {
+        th.addEventListener('click', function() {
+            var table = th.closest('table');
+            var tbody = table.querySelector('tbody');
+            var rows = Array.from(tbody.querySelectorAll('tr'));
+            var colIndex = Array.from(th.parentNode.children).indexOf(th);
+            var sortType = th.getAttribute('data-sort-type');
+
+            var asc = (currentSort.col === colIndex) ? !currentSort.asc : true;
+            currentSort = { col: colIndex, asc: asc };
+
+            rows.sort(function(a, b) {
+                var aVal = a.children[colIndex].textContent.trim();
+                var bVal = b.children[colIndex].textContent.trim();
+                if (sortType === 'number') {
+                    aVal = parseFloat(aVal.replace(/[$,%]/g, '')) || 0;
+                    bVal = parseFloat(bVal.replace(/[$,%]/g, '')) || 0;
+                    return asc ? aVal - bVal : bVal - aVal;
+                }
+                return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+            });
+
+            rows.forEach(function(row) { tbody.appendChild(row); });
+
+            // Update indicators
+            sortableHeaders.forEach(function(h) {
+                h.querySelector('.sort-indicator').textContent = '';
+            });
+            th.querySelector('.sort-indicator').textContent = asc ? ' \u25B2' : ' \u25BC';
+        });
+    });
+});
+</script>
 {% endblock %}

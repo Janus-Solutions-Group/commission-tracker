@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/table_controls.html" import search_bar, sort_header %}
 
 {% block title %}Projects - Commission Tracker{% endblock %}
 
@@ -22,16 +23,18 @@
 
 <div class="card">
     <div class="card-body">
+        {{ search_bar('projects_list', search) }}
+
         {% if projects.items %}
             <div class="table-responsive">
                 <table class="table table-striped align-middle">
                     <thead>
                         <tr>
-                            <th>PID</th>
-                            <th>Name</th>
-                            <th>Client</th>
-                            <th class="text-end">Allocated Hrs</th>
-                            <th class="text-end">Extra Hrs</th>
+                            {{ sort_header('PID', 'project_id', sort, order, search) }}
+                            {{ sort_header('Name', 'name', sort, order, search) }}
+                            {{ sort_header('Client', 'client', sort, order, search) }}
+                            {{ sort_header('Allocated Hrs', 'allocated_hours', sort, order, search, align='end') }}
+                            {{ sort_header('Extra Hrs', 'extra_hours', sort, order, search, align='end') }}
                             <th class="text-end">Worked Hrs</th>
                             <th class="text-end">Remaining Hrs</th>
                             <th class="text-end">Revenue</th>
@@ -80,6 +83,13 @@
             </div>
 
             {% include 'components/pagination.html' %}
+        {% elif search %}
+            <div class="text-center py-5">
+                <i data-feather="search" style="width: 64px; height: 64px;" class="text-muted mb-3"></i>
+                <h4 class="text-muted">No results found</h4>
+                <p class="text-muted">No projects match "{{ search }}". Try a different search term.</p>
+                <a href="{{ url_for('projects_list') }}" class="btn btn-outline-primary">Clear Search</a>
+            </div>
         {% else %}
             <div class="text-center py-5">
                 <i data-feather="folder" style="width: 64px; height: 64px;" class="text-muted mb-3"></i>

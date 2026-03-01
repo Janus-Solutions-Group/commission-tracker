@@ -1,0 +1,43 @@
+{% macro search_bar(endpoint, search_value) %}
+<form method="GET" action="{{ url_for(endpoint) }}" class="mb-3">
+    <div class="row g-2 align-items-center">
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0">
+                    <i data-feather="search" style="width: 16px; height: 16px;"></i>
+                </span>
+                <input type="text" name="search" class="form-control border-start-0"
+                       placeholder="Search..." value="{{ search_value }}"
+                       style="padding: 0.5rem 0.75rem;">
+                <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem;">Search</button>
+            </div>
+        </div>
+        {% if search_value %}
+        <div class="col-auto">
+            <a href="{{ url_for(endpoint) }}" class="btn btn-outline-secondary" style="padding: 0.5rem 1rem;">
+                <i data-feather="x" style="width: 14px; height: 14px;"></i> Clear
+            </a>
+        </div>
+        {% endif %}
+        <div class="col text-end">
+            <small class="text-muted">Click on a column header to sort</small>
+        </div>
+    </div>
+</form>
+{% endmacro %}
+
+{% macro sort_header(label, column, current_sort, current_order, search, align='') %}
+<th class="sortable-header {{ 'text-' + align if align else '' }}">
+    <a href="?sort={{ column }}&order={{ 'desc' if current_sort == column and current_order == 'asc' else 'asc' }}{% if search %}&search={{ search }}{% endif %}"
+       class="d-inline-flex align-items-center gap-1">
+        {{ label }}
+        {% if current_sort == column %}
+            {% if current_order == 'asc' %}
+                <i data-feather="chevron-up" class="sort-icon"></i>
+            {% else %}
+                <i data-feather="chevron-down" class="sort-icon"></i>
+            {% endif %}
+        {% endif %}
+    </a>
+</th>
+{% endmacro %}

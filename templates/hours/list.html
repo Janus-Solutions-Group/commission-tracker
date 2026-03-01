@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/table_controls.html" import search_bar, sort_header %}
 
 {% block title %}Hours Entries - Commission Tracker{% endblock %}
 
@@ -22,16 +23,17 @@
 
 <div class="card">
     <div class="card-body">
+        {{ search_bar('hours_list', search) }}
+
         {% if hours.items %}
             <div class="table-responsive">
                 <table class="table table-striped align-middle">
                     <thead>
                         <tr>
-                            <th class="text-center">Date</th>
-                            <th>Employee</th>
-                            <th>Project</th>
-                            <!-- <th class="text-end">Hours Worked</th> -->
-                            <th class="text-end">Hours Billed</th>
+                            {{ sort_header('Date', 'date', sort, order, search, align='center') }}
+                            {{ sort_header('Employee', 'employee', sort, order, search) }}
+                            {{ sort_header('Project', 'project', sort, order, search) }}
+                            {{ sort_header('Hours Billed', 'hours_billed', sort, order, search, align='end') }}
                             <th class="text-end">Efficiency</th>
                             <th class="text-end">Commission</th>
                             <th class="text-end">Revenue</th>
@@ -50,7 +52,6 @@
                                 {{ entry.project.name }}<br>
                                 <small class="text-muted">{{ entry.project.client }}</small>
                             </td>
-                            <!-- <td class="text-end">{{ "%.2f"|format(entry.hours_worked) }}</td> -->
                             <td class="text-end">{{ "%.2f"|format(entry.hours_billed) }}</td>
                             <td class="text-end">
                                 {% set efficiency = (entry.hours_billed / entry.hours_worked * 100) if entry.hours_worked > 0 else 0 %}
@@ -67,7 +68,7 @@
                                     <a href="{{ url_for('hours_edit', id=entry.id) }}" class="btn btn-outline-secondary">
                                         <i data-feather="edit-2"></i>
                                     </a>
-                                    <form method="POST" action="{{ url_for('hours_delete', id=entry.id) }}" class="d-inline" 
+                                    <form method="POST" action="{{ url_for('hours_delete', id=entry.id) }}" class="d-inline"
                                           onsubmit="return confirm('Are you sure you want to delete this hours entry?')">
                                         <button type="submit" class="btn btn-outline-danger">
                                             <i data-feather="trash-2"></i>
@@ -82,6 +83,13 @@
             </div>
 
             {% include 'components/pagination.html' %}
+        {% elif search %}
+            <div class="text-center py-5">
+                <i data-feather="search" style="width: 64px; height: 64px;" class="text-muted mb-3"></i>
+                <h4 class="text-muted">No results found</h4>
+                <p class="text-muted">No hours entries match "{{ search }}". Try a different search term.</p>
+                <a href="{{ url_for('hours_list') }}" class="btn btn-outline-primary">Clear Search</a>
+            </div>
         {% else %}
             <div class="text-center py-5">
                 <i data-feather="clock" style="width: 64px; height: 64px;" class="text-muted mb-3"></i>
