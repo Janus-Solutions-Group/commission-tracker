@@ -109,44 +109,55 @@ def index():
             f"for employee_id={employee_id}, date range={date_from} to {date_to}"
         )
 
-        employee = Employee.query.get_or_404(employee_id)
+        employee = Employee.query.filter_by(
+            id=employee_id, company_id=current_user.company_id
+        ).first_or_404()
 
+        # Only fetch projects this employee is actually assigned to, scoped to company
         projects = Project.query.options(
-            joinedload(Project.project_staff).joinedload(ProjectStaff.employee)
+            joinedload(Project.project_staff)
+        ).join(ProjectStaff).filter(
+            Project.company_id == current_user.company_id,
+            ProjectStaff.employee_id == employee_id
         ).all()
 
-        all_hours = HoursEntry.query.filter(
-            HoursEntry.employee_id == employee_id,
+        project_ids = [p.id for p in projects]
+
+        # Single query for all hours across all relevant projects in date range
+        all_project_hours = HoursEntry.query.filter(
+            HoursEntry.project_id.in_(project_ids),
             HoursEntry.date >= date_from,
             HoursEntry.date <= date_to
-        ).all()
+        ).all() if project_ids else []
 
-        app.logger.debug(f"Fetched {len(all_hours)} hours entries for employee_id={employee_id}")
+        app.logger.debug(
+            f"Fetched {len(all_project_hours)} hours entries across "
+            f"{len(project_ids)} projects for employee_id={employee_id}"
+        )
 
-        # Map hours by project
-        project_hours_map = {}
-        for entry in all_hours:
-            project_hours_map.setdefault(entry.project_id, []).append(entry)
+        # Map: project_id -> employee_id -> total hours worked
+        project_emp_hours = {}
+        for entry in all_project_hours:
+            project_emp_hours.setdefault(entry.project_id, {})
+            project_emp_hours[entry.project_id][entry.employee_id] = (
+                project_emp_hours[entry.project_id].get(entry.employee_id, 0) + entry.hours_worked
+            )
 
         for project in projects:
-            hours_entries = project_hours_map.get(project.id, [])
             staff_map = {ps.employee_id: ps for ps in project.project_staff}
             staff = staff_map.get(employee_id)
             if not staff:
                 continue
 
-            emp = staff.employee
-            hours = sum(e.hours_worked for e in hours_entries)
+            emp = employee
+            emp_hours_map = project_emp_hours.get(project.id, {})
+            hours = emp_hours_map.get(employee_id, 0)
             revenue = hours * (staff.hourly_rate or 0)
-            
+
+            # Total project revenue: sum across all staff using their rates
             total_project_revenue = sum(
-                he.hours_worked * (staff_map.get(he.employee_id).hourly_rate or 0)
-                for he in HoursEntry.query.filter(
-                    HoursEntry.project_id == project.id,
-                    HoursEntry.date >= date_from,
-                    HoursEntry.date <= date_to
-                )
-                if staff_map.get(he.employee_id)
+                emp_hours_map.get(eid, 0) * (ps.hourly_rate or 0)
+                for eid, ps in staff_map.items()
             )
 
             # Commission calculation
@@ -209,14 +220,16 @@ def dashboard():
 
     projects = Project.query.options(
         joinedload(Project.project_staff).joinedload(ProjectStaff.employee)
-    ).filter_by(company_id=current_user.company_id)
+    ).filter_by(company_id=current_user.company_id).all()
 
-    query = HoursEntry.query
+    project_ids = [p.id for p in projects]
+
+    hours_query = HoursEntry.query.filter(HoursEntry.project_id.in_(project_ids)) if project_ids else HoursEntry.query.filter(False)
     if date_from:
-        query = query.filter(HoursEntry.date >= date_from)
+        hours_query = hours_query.filter(HoursEntry.date >= date_from)
     if date_to:
-        query = query.filter(HoursEntry.date <= date_to)
-    all_hours = query.all()
+        hours_query = hours_query.filter(HoursEntry.date <= date_to)
+    all_hours = hours_query.all()
 
     app.logger.debug(f"Fetched {len(all_hours)} hours entries for dashboard")
 
@@ -421,7 +434,7 @@ def projects_detail(id):
         HoursEntry.date.desc(), HoursEntry.created_at.desc()
     ).all()
 
-    # Pre-fetch ProjectStaff for commission_earned to avoid N+1
+    # Pre-fetch ProjectStaff and pre-compute commission_earned to avoid N+1
     if hour_entries:
         pairs = set((e.employee_id, e.project_id) for e in hour_entries)
         pair_filters = [
@@ -433,9 +446,54 @@ def projects_detail(id):
         for entry in hour_entries:
             entry._prefetched_project_staff = staff_map.get((entry.employee_id, entry.project_id))
 
+        # Compute project-level aggregates in Python from already-loaded entries
+        project_revenue = sum(
+            e.hours_billed * (e.employee.hourly_rate or 0) for e in hour_entries
+        )
+        associate_emp_ids = {
+            e.employee_id for e in hour_entries if e.employee.role.lower() == 'associate'
+        }
+        associate_revenue = sum(
+            e.hours_billed * (e.employee.hourly_rate or 0)
+            for e in hour_entries if e.employee_id in associate_emp_ids
+        )
+        for entry in hour_entries:
+            staff = entry._prefetched_project_staff
+            if not staff or not entry.employee:
+                entry._prefetched_commission_earned = 0.0
+                continue
+            commission_pct = (staff.commission_percentage or 0) / 100
+            hourly_rate = entry.employee.hourly_rate or 0
+            role = entry.employee.role.lower()
+            if role == 'associate':
+                comm = entry.hours_worked * hourly_rate * commission_pct
+            elif role == 'director':
+                comm = entry.hours_worked * hourly_rate * commission_pct
+                comm += (project_revenue * entry.employee.override_percentage / 100) if entry.employee.override_percentage else 0
+            else:
+                comm = associate_revenue * commission_pct
+            entry._prefetched_commission_earned = comm
+
     app.logger.debug(f"[Projects Detail] Retrieved {len(hour_entries)} hour entries for project id={project.id}")
 
-    return render_template('projects/detail.html', project=project, hour_entries=hour_entries)
+    # Per-employee summary for Hours Summary table
+    emp_summary = {}
+    for entry in hour_entries:
+        eid = entry.employee_id
+        if eid not in emp_summary:
+            emp_summary[eid] = {
+                'name': entry.employee.name,
+                'role': entry.employee.role,
+                'hours_billed': 0.0,
+                'revenue': 0.0,
+                'commission': 0.0,
+            }
+        emp_summary[eid]['hours_billed'] += entry.hours_billed or 0
+        emp_summary[eid]['revenue'] += entry.revenue_generated or 0
+        emp_summary[eid]['commission'] += entry.commission_earned or 0
+    hours_summary = sorted(emp_summary.values(), key=lambda x: x['name'])
+
+    return render_template('projects/detail.html', project=project, hour_entries=hour_entries, hours_summary=hours_summary)
 
 # Employees routes
 @app.route('/employees')
@@ -498,7 +556,7 @@ def employees_new():
             name=form.name.data,
             role=form.role.data,
             hourly_rate=form.hourly_rate.data,
-            override_percentage=(form.override_percentage.data or 2.0) if form.role.data == 'Director' else 0.0,
+            override_percentage=(form.override_percentage.data if form.override_percentage.data is not None else 2.0) if form.role.data == 'Director' else 0.0,
             company_id=current_user.company_id
         )
         db.session.add(employee)
@@ -519,7 +577,7 @@ def employees_edit(id):
         app.logger.debug(f"[Employees Edit] Updating employee id={employee.id}")
         form.populate_obj(employee)
         if employee.role == "Director":
-            employee.override_percentage = form.override_percentage.data or 2.0
+            employee.override_percentage = form.override_percentage.data if form.override_percentage.data is not None else 2.0
         else:
             employee.override_percentage = 0.0
         db.session.commit()
@@ -685,7 +743,7 @@ def hours_list():
 
     hours = get_paginated_query(query, page, per_page)
 
-    # Pre-fetch ProjectStaff for commission_earned to avoid N+1
+    # Pre-fetch ProjectStaff and pre-compute commission_earned to avoid N+1
     if hours.items:
         pairs = set((e.employee_id, e.project_id) for e in hours.items)
         pair_filters = [
@@ -696,6 +754,44 @@ def hours_list():
         staff_map = {(s.employee_id, s.project_id): s for s in all_staff}
         for entry in hours.items:
             entry._prefetched_project_staff = staff_map.get((entry.employee_id, entry.project_id))
+
+        # Batch aggregate project and associate revenue for all projects on this page
+        page_project_ids = list({e.project_id for e in hours.items})
+        proj_rev_rows = db.session.query(
+            HoursEntry.project_id,
+            func.coalesce(func.sum(HoursEntry.hours_billed * Employee.hourly_rate), 0)
+        ).join(Employee, HoursEntry.employee_id == Employee.id).filter(
+            HoursEntry.project_id.in_(page_project_ids)
+        ).group_by(HoursEntry.project_id).all()
+        proj_rev_map = {row[0]: row[1] for row in proj_rev_rows}
+
+        assoc_rev_rows = db.session.query(
+            HoursEntry.project_id,
+            func.coalesce(func.sum(HoursEntry.hours_billed * Employee.hourly_rate), 0)
+        ).join(Employee, HoursEntry.employee_id == Employee.id).filter(
+            HoursEntry.project_id.in_(page_project_ids),
+            Employee.role.ilike('associate')
+        ).group_by(HoursEntry.project_id).all()
+        assoc_rev_map = {row[0]: row[1] for row in assoc_rev_rows}
+
+        for entry in hours.items:
+            staff = staff_map.get((entry.employee_id, entry.project_id))
+            if not staff or not entry.employee:
+                entry._prefetched_commission_earned = 0.0
+                continue
+            commission_pct = (staff.commission_percentage or 0) / 100
+            hourly_rate = entry.employee.hourly_rate or 0
+            role = entry.employee.role.lower()
+            project_revenue = proj_rev_map.get(entry.project_id, 0)
+            associate_revenue = assoc_rev_map.get(entry.project_id, 0)
+            if role == 'associate':
+                comm = entry.hours_worked * hourly_rate * commission_pct
+            elif role == 'director':
+                comm = entry.hours_worked * hourly_rate * commission_pct
+                comm += (project_revenue * entry.employee.override_percentage / 100) if entry.employee.override_percentage else 0
+            else:
+                comm = associate_revenue * commission_pct
+            entry._prefetched_commission_earned = comm
 
     app.logger.debug(f"[Hours List] Retrieved {len(hours.items)} entries on page {page}")
     return render_template('hours/list.html', hours=hours, search=search, sort=sort, order=order)

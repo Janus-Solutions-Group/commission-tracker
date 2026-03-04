@@ -69,13 +69,11 @@ class Project(db.Model):
     def total_revenue(self):
         if '_prefetched_revenue' in self.__dict__:
             return self.__dict__['_prefetched_revenue']
-        total = 0
-        entries = HoursEntry.query.filter_by(project_id=self.id).all()
-        for entry in entries:
-            employee = Employee.query.get(entry.employee_id)
-            if employee:
-                total += entry.hours_billed * employee.hourly_rate
-        return total
+        return db.session.query(
+            func.coalesce(func.sum(HoursEntry.hours_billed * Employee.hourly_rate), 0)
+        ).join(Employee, HoursEntry.employee_id == Employee.id).filter(
+            HoursEntry.project_id == self.id
+        ).scalar() or 0
     
     @property
     def remaining_hours(self):
@@ -191,6 +189,9 @@ class HoursEntry(db.Model):
 
     @property
     def commission_earned(self):
+        if '_prefetched_commission_earned' in self.__dict__:
+            return self.__dict__['_prefetched_commission_earned']
+
         from sqlalchemy.orm import object_session
         session = object_session(self)
 

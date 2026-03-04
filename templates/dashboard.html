@@ -65,18 +65,19 @@
                     </div>
                 </div>
             </div>
-            <div class="table-responsive">
+            <div style="min-height: 350px; max-height: 520px; overflow-y: auto;">
                 <table class="table table-bordered table-striped align-middle" id="dashboardTable">
-                    <thead class="table-dark">
+                    <thead class="table-dark sticky-top">
                         <tr>
                             <th data-sortable data-sort-type="text">Employee <span class="sort-indicator"></span></th>
                             <th class="text-end" data-sortable data-sort-type="number">Hours <span class="sort-indicator"></span></th>
                             <th class="text-end" data-sortable data-sort-type="number">Revenue <span class="sort-indicator"></span></th>
                             <th class="text-end" data-sortable data-sort-type="number">Commission <span class="sort-indicator"></span></th>
+                            <th class="text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for entry in report_data %}
+                        {% for entry in report_data if entry.total_revenue != 0 or entry.total_commission != 0 %}
                         <tr>
                             <td>
                                 <strong>{{ entry.employee.name }}</strong><br>
@@ -85,15 +86,25 @@
                             <td class="text-end">{{ "%.2f"|format(entry.total_hours) }}</td>
                             <td class="text-end">${{ "%.2f"|format(entry.total_revenue) }}</td>
                             <td class="text-end text-success">${{ "%.2f"|format(entry.total_commission) }}</td>
+                            <td class="text-center">
+                                <button class="btn btn-sm btn-outline-primary"
+                                    data-employee-name="{{ entry.employee.name }}"
+                                    data-employee-role="{{ entry.employee.role }}"
+                                    data-by-project="{{ entry.by_project | tojson | forceescape }}"
+                                    onclick="openProjectDrawer(this)">
+                                    <i data-feather="layers" style="width:14px;height:14px;"></i> Breakdown
+                                </button>
+                            </td>
                         </tr>
                         {% endfor %}
             </tbody>
-            <tfoot class="table-light fw-bold">
+            <tfoot class="table-light fw-bold" style="position: sticky; bottom: 0;">
                 <tr>
                     <td class="text-end">Total</td>
                     <td class="text-end">{{ "%.2f"|format(report_data | sum(attribute='total_hours')) }}</td>
                     <td class="text-end">${{ "%.2f"|format(report_data | sum(attribute='total_revenue')) }}</td>
                     <td class="text-end text-success">${{ "%.2f"|format(report_data | sum(attribute='total_commission')) }}</td>
+                    <td></td>
                 </tr>
             </tfoot>
         </table>
@@ -106,50 +117,22 @@
                     <p class="text-muted">Try adding hours to a project to see commissions here.</p>
                 </div>
             {% endif %}
-            <!-- Modals go outside table -->
-            {% for entry in report_data %}
-            <div class="modal fade" id="modal{{ entry.employee.id }}" tabindex="-1" aria-labelledby="modalLabel{{ entry.employee.id }}" aria-hidden="true">
-                <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                    <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="modalLabel{{ entry.employee.id }}">
-                        {{ entry.employee.name }} - Project Breakdown
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        {% if entry.by_project %}
-                        <table class="table table-sm table-striped">
-                        <thead>
-                            <tr>
-                            <th>Project</th>
-                            <th class="text-end">Hours</th>
-                            <th class="text-end">Revenue</th>
-                            <th class="text-end">Commission</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for project in entry.by_project %}
-                            <tr>
-                            <td>{{ project.project }}</td>
-                            <td class="text-end">{{ "%.2f"|format(project.hours) }}</td>
-                            <td class="text-end">${{ "%.2f"|format(project.revenue) }}</td>
-                            <td class="text-end text-success">${{ "%.2f"|format(project.commission) }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                        </table>
-                        {% else %}
-                        <p class="text-muted">No project data available.</p>
-                        {% endif %}
-                    </div>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Project Breakdown Offcanvas Drawer (must be outside card to avoid overflow clipping) -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="projectBreakdownDrawer" style="width: min(680px, 95vw);">
+    <div class="offcanvas-header border-bottom py-3 px-4">
+        <div>
+            <h5 class="offcanvas-title mb-1" id="drawerEmployeeName"></h5>
+            <small class="text-muted" id="drawerEmployeeRole"></small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body p-0">
+        <div id="drawerContent" class="p-4"></div>
     </div>
 </div>
 
@@ -157,6 +140,61 @@
 
 {% block scripts %}
 <script>
+function openProjectDrawer(btn) {
+    var name = btn.getAttribute('data-employee-name');
+    var role = btn.getAttribute('data-employee-role');
+    var byProject = JSON.parse(btn.getAttribute('data-by-project'));
+
+    document.getElementById('drawerEmployeeName').textContent = name + ' — Project Breakdown';
+    document.getElementById('drawerEmployeeRole').textContent = role;
+
+    var content = document.getElementById('drawerContent');
+    var filtered = (byProject || []).filter(function(p) { return p.commission !== 0; });
+    if (filtered.length === 0) {
+        content.innerHTML = '<p class="text-muted">No commission-earning projects found.</p>';
+    } else {
+        byProject = filtered;
+        var totalHours = 0, totalRevenue = 0, totalCommission = 0;
+        var rows = byProject.map(function(p) {
+            totalHours += p.hours;
+            totalRevenue += p.revenue;
+            totalCommission += p.commission;
+            return '<tr>' +
+                '<td>' + p.project + '</td>' +
+                '<td class="text-end">' + p.hours.toFixed(2) + '</td>' +
+                '<td class="text-end">$' + p.revenue.toFixed(2) + '</td>' +
+                '<td class="text-end text-success">$' + p.commission.toFixed(2) + '</td>' +
+            '</tr>';
+        }).join('');
+
+        content.innerHTML =
+            '<div class="table-responsive">' +
+            '<table class="table table-sm table-striped align-middle mb-0" style="font-size:0.875rem;">' +
+            '<thead class="table-dark">' +
+                '<tr>' +
+                    '<th>Project</th>' +
+                    '<th class="text-end">Hours</th>' +
+                    '<th class="text-end">Revenue</th>' +
+                    '<th class="text-end">Commission</th>' +
+                '</tr>' +
+            '</thead>' +
+            '<tbody>' + rows + '</tbody>' +
+            '<tfoot class="table-light fw-bold">' +
+                '<tr>' +
+                    '<td>Total</td>' +
+                    '<td class="text-end">' + totalHours.toFixed(2) + '</td>' +
+                    '<td class="text-end">$' + totalRevenue.toFixed(2) + '</td>' +
+                    '<td class="text-end text-success">$' + totalCommission.toFixed(2) + '</td>' +
+                '</tr>' +
+            '</tfoot>' +
+            '</table></div>';
+    }
+
+    var drawer = bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('projectBreakdownDrawer'));
+    drawer.show();
+    feather.replace();
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Client-side search
     var searchInput = document.getElementById('dashboardSearch');

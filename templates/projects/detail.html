@@ -21,61 +21,66 @@
     </div>
 </div>
 
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card">
-            <div class="card-body text-center">
-                <h4 class="text-primary">{{ "%.2f"|format(project.total_allocated_hours) }}</h4>
-                <small class="text-muted">Total Allocated Hours</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card">
-            <div class="card-body text-center">
-                <h4 class="text-primary">{{ "%.2f"|format(project.extra_hours) }}</h4>
-                <small class="text-muted">Extra Hours</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card">
-            <div class="card-body text-center">
-                <h4 class="text-info">{{ "%.2f"|format(project.total_hours_worked) }}</h4>
-                <small class="text-muted">Hours Worked</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card">
-            <div class="card-body text-center">
-                <h4 class="{% if project.remaining_hours < 0 %}text-danger{% else %}text-warning{% endif %}">
-                    {{ "%.2f"|format(project.remaining_hours) }}
-                </h4>
-                <small class="text-muted">Remaining Hours</small>
-            </div>
-        </div>
-    </div>
-</div>
+<div class="row mb-4 align-items-stretch">
 
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5><i data-feather="info"></i> Project Information</h5>
+    <!-- Left column: stat cards + project info -->
+    <div class="col-md-5 d-flex flex-column gap-3">
+
+        <!-- 4 stat cards stacked in a 2x2 grid -->
+        <div class="row g-3">
+            <div class="col-6">
+                <div class="card h-100">
+                    <div class="card-body text-center py-3">
+                        <h4 class="text-primary mb-1">{{ "%.2f"|format(project.total_allocated_hours) }}</h4>
+                        <small class="text-muted">Allocated Hours</small>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <table class="table table-borderless">
+            <div class="col-6">
+                <div class="card h-100">
+                    <div class="card-body text-center py-3">
+                        <h4 class="text-primary mb-1">{{ "%.2f"|format(project.extra_hours) }}</h4>
+                        <small class="text-muted">Extra Hours</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card h-100">
+                    <div class="card-body text-center py-3">
+                        <h4 class="text-info mb-1">{{ "%.2f"|format(project.total_hours_worked) }}</h4>
+                        <small class="text-muted">Hours Worked</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card h-100">
+                    <div class="card-body text-center py-3">
+                        <h4 class="{% if project.remaining_hours < 0 %}text-danger{% else %}text-warning{% endif %} mb-1">
+                            {{ "%.2f"|format(project.remaining_hours) }}
+                        </h4>
+                        <small class="text-muted">Remaining Hours</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Project Information -->
+        <div class="card flex-grow-1">
+            <div class="card-header">
+                <h5 class="mb-0"><i data-feather="info"></i> Project Information</h5>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-borderless mb-0">
                     <tr>
-                        <td><strong>Client:</strong></td>
+                        <td class="ps-3"><strong>Client</strong></td>
                         <td>{{ project.client }}</td>
                     </tr>
                     <tr>
-                        <td><strong>Start Date:</strong></td>
+                        <td class="ps-3"><strong>Start Date</strong></td>
                         <td>{{ project.start_date.strftime('%B %d, %Y') }}</td>
                     </tr>
                     <tr>
-                        <td><strong>End Date:</strong></td>
+                        <td class="ps-3"><strong>End Date</strong></td>
                         <td>
                             {% if project.end_date %}
                                 {{ project.end_date.strftime('%B %d, %Y') }}
@@ -85,64 +90,121 @@
                         </td>
                     </tr>
                     <tr>
-                        <td><strong>Total Revenue:</strong></td>
+                        <td class="ps-3"><strong>Total Revenue</strong></td>
                         <td class="text-success">${{ "%.2f"|format(project.total_revenue) }}</td>
                     </tr>
                 </table>
             </div>
         </div>
+
     </div>
-    <div class="col-md-6">
-        <div class="card mb-4">
+
+    <!-- Right column: Hours Summary with scroll -->
+    <div class="col-md-7">
+        <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5><i data-feather="clock"></i> Hours Summary</h5>
+                <h5 class="mb-0"><i data-feather="clock"></i> Hours Summary</h5>
                 <a href="{{ url_for('hours_new') }}" class="btn btn-sm btn-primary">
                     <i data-feather="plus"></i> Add Hours
                 </a>
             </div>
-            <div class="card-body">
-                <div class="progress mb-3">
-                    {% set progress_percentage = (project.total_hours_worked / (project.total_allocated_hours + project.extra_hours) * 100) if (project.total_allocated_hours + project.extra_hours) > 0 else 0 %}
-                    <div class="progress-bar bg-primary" role="progressbar" 
-                         {% if progress_percentage > 100 %}
-                         style="width: 100%"
-                         {% else %}
-                         style="width: {{ progress_percentage }}%"
-                         {% endif %}
-                         aria-valuenow="{{ progress_percentage }}" 
-                         aria-valuemin="0" 
-                         aria-valuemax="100">
-                        {{ "%.2f"|format(progress_percentage) }}%
+            <div class="card-body d-flex flex-column">
+
+                {% set progress_percentage = (project.total_hours_worked / (project.total_allocated_hours + project.extra_hours) * 100) if (project.total_allocated_hours + project.extra_hours) > 0 else 0 %}
+                <div class="progress mb-2" style="height: 10px;">
+                    <div class="progress-bar {% if progress_percentage > 100 %}bg-danger{% else %}bg-primary{% endif %}"
+                         role="progressbar"
+                         style="width: {{ [progress_percentage, 100] | min }}%"
+                         aria-valuenow="{{ progress_percentage }}"
+                         aria-valuemin="0" aria-valuemax="100">
                     </div>
                 </div>
-                <p class="text-muted small">
+                <p class="text-muted small mb-3">
+                    {{ "%.2f"|format(progress_percentage) }}% used &mdash;
                     {% if project.remaining_hours >= 0 %}
                         {{ "%.2f"|format(project.remaining_hours) }} hours remaining
                     {% else %}
                         <span class="text-danger">{{ "%.2f"|format(-project.remaining_hours) }} hours over budget</span>
                     {% endif %}
                 </p>
+
+                {% if hours_summary %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="input-group input-group-sm" style="max-width: 260px;">
+                        <span class="input-group-text bg-white border-end-0">
+                            <i data-feather="search" style="width:14px;height:14px;"></i>
+                        </span>
+                        <input type="text" id="summarySearch" class="form-control border-start-0" placeholder="Filter employees...">
+                    </div>
+                    <small class="text-muted">Click on a column header to sort</small>
+                </div>
+                <div style="min-height: 228px; max-height: 340px; overflow-y: auto;">
+                    <table class="table table-sm table-striped align-middle mb-0" id="summaryTable" style="font-size: 0.875rem;">
+                        <thead class="table-dark sticky-top">
+                            <tr>
+                                <th data-sortable data-sort-type="text">Employee <span class="sort-indicator"></span></th>
+                                <th class="text-end" data-sortable data-sort-type="number">Hours Billed <span class="sort-indicator"></span></th>
+                                <th class="text-end" data-sortable data-sort-type="number">Revenue <span class="sort-indicator"></span></th>
+                                <th class="text-end" data-sortable data-sort-type="number">Commission <span class="sort-indicator"></span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in hours_summary %}
+                            <tr>
+                                <td>
+                                    <strong>{{ row.name }}</strong><br>
+                                    <small class="text-muted">{{ row.role }}</small>
+                                </td>
+                                <td class="text-end">{{ "%.2f"|format(row.hours_billed) }}</td>
+                                <td class="text-end">${{ "%.2f"|format(row.revenue) }}</td>
+                                <td class="text-end text-success">${{ "%.2f"|format(row.commission) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light fw-bold" style="position: sticky; bottom: 0;">
+                            <tr>
+                                <td>Total</td>
+                                <td class="text-end">{{ "%.2f"|format(hours_summary | sum(attribute='hours_billed')) }}</td>
+                                <td class="text-end">${{ "%.2f"|format(hours_summary | sum(attribute='revenue')) }}</td>
+                                <td class="text-end text-success">${{ "%.2f"|format(hours_summary | sum(attribute='commission')) }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">No hours logged yet.</div>
+                {% endif %}
+
             </div>
         </div>
     </div>
+
 </div>
 
 <div class="card">
     <div class="card-header">
-        <h5><i data-feather="list"></i> Hour Entries</h5>
+        <h5 class="mb-0"><i data-feather="list"></i> Hour Entries</h5>
     </div>
     <div class="card-body">
         {% if hour_entries %}
-            <div class="table-responsive">
-                <table class="table table-striped align-middle">
-                    <thead>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="input-group input-group-sm" style="max-width: 300px;">
+                    <span class="input-group-text bg-white border-end-0">
+                        <i data-feather="search" style="width:14px;height:14px;"></i>
+                    </span>
+                    <input type="text" id="entriesSearch" class="form-control border-start-0" placeholder="Filter entries...">
+                </div>
+                <small class="text-muted">Click on a column header to sort</small>
+            </div>
+            <div style="max-height: 420px; overflow-y: auto;">
+                <table class="table table-striped align-middle" id="entriesTable">
+                    <thead class="sticky-top table-dark">
                         <tr>
-                            <th>Date</th>
-                            <th>Employee</th>
-                            <!-- <th class="text-end">Hours Worked</th> -->
-                            <th class="text-end">Hours Billed</th>
-                            <th class="text-end">Revenue</th>
-                            <th class="text-end">Commission</th>
+                            <th data-sortable data-sort-type="text">Date <span class="sort-indicator"></span></th>
+                            <th data-sortable data-sort-type="text">Employee <span class="sort-indicator"></span></th>
+                            <th class="text-end" data-sortable data-sort-type="number">Hours Billed <span class="sort-indicator"></span></th>
+                            <th class="text-end" data-sortable data-sort-type="number">Revenue <span class="sort-indicator"></span></th>
+                            <th class="text-end" data-sortable data-sort-type="number">Commission <span class="sort-indicator"></span></th>
                             <th class="text-center">Actions</th>
                         </tr>
                     </thead>
@@ -154,7 +216,6 @@
                                 <strong>{{ entry.employee.name }}</strong><br>
                                 <small class="text-muted">{{ entry.employee.role }}</small>
                             </td>
-                            <!-- <td class="text-end">{{ "%.2f"|format(entry.hours_worked) }}</td> -->
                             <td class="text-end">{{ "%.2f"|format(entry.hours_billed) }}</td>
                             <td class="text-end text-success">${{ "%.2f"|format(entry.revenue_generated) }}</td>
                             <td class="text-end text-primary">${{ "%.2f"|format(entry.commission_earned) }}</td>
@@ -163,7 +224,7 @@
                                     <a href="{{ url_for('hours_edit', id=entry.id) }}" class="btn btn-outline-secondary">
                                         <i data-feather="edit-2"></i>
                                     </a>
-                                    <form method="POST" action="{{ url_for('hours_delete', id=entry.id, redirect=0) }}" class="d-inline" 
+                                    <form method="POST" action="{{ url_for('hours_delete', id=entry.id, redirect=0) }}" class="d-inline"
                                         onsubmit="return confirm('Are you sure you want to delete this hour entry?')">
                                         <button type="submit" class="btn btn-outline-danger">
                                             <i data-feather="trash-2"></i>
@@ -174,6 +235,15 @@
                         </tr>
                         {% endfor %}
                     </tbody>
+                    <tfoot class="table-light fw-bold" style="position: sticky; bottom: 0;">
+                        <tr>
+                            <td colspan="2">Total</td>
+                            <td class="text-end">{{ "%.2f"|format(hour_entries | sum(attribute='hours_billed')) }}</td>
+                            <td class="text-end text-success">${{ "%.2f"|format(hour_entries | sum(attribute='revenue_generated')) }}</td>
+                            <td class="text-end text-primary">${{ "%.2f"|format(hour_entries | sum(attribute='commission_earned')) }}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
 
@@ -189,4 +259,61 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function initSearch(inputId, tableId) {
+    var input = document.getElementById(inputId);
+    if (!input) return;
+    input.addEventListener('input', function() {
+        var term = this.value.toLowerCase();
+        document.querySelectorAll('#' + tableId + ' tbody tr').forEach(function(row) {
+            row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
+        });
+    });
+}
+
+function initSort(tableId) {
+    var headers = document.querySelectorAll('#' + tableId + ' thead th[data-sortable]');
+    var currentSort = { col: -1, asc: true };
+    headers.forEach(function(th) {
+        th.style.cursor = 'pointer';
+        th.addEventListener('click', function() {
+            var tbody = document.querySelector('#' + tableId + ' tbody');
+            var rows = Array.from(tbody.querySelectorAll('tr'));
+            var colIndex = Array.from(th.parentNode.children).indexOf(th);
+            var sortType = th.getAttribute('data-sort-type');
+            var asc = currentSort.col === colIndex ? !currentSort.asc : true;
+            currentSort = { col: colIndex, asc: asc };
+
+            rows.sort(function(a, b) {
+                var aVal = a.children[colIndex].textContent.trim();
+                var bVal = b.children[colIndex].textContent.trim();
+                if (sortType === 'number') {
+                    aVal = parseFloat(aVal.replace(/[$,%]/g, '')) || 0;
+                    bVal = parseFloat(bVal.replace(/[$,%]/g, '')) || 0;
+                    return asc ? aVal - bVal : bVal - aVal;
+                }
+                return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+            });
+            rows.forEach(function(row) { tbody.appendChild(row); });
+
+            headers.forEach(function(h) {
+                var ind = h.querySelector('.sort-indicator');
+                if (ind) ind.textContent = '';
+            });
+            var ind = th.querySelector('.sort-indicator');
+            if (ind) ind.textContent = asc ? ' \u25B2' : ' \u25BC';
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    initSearch('summarySearch', 'summaryTable');
+    initSort('summaryTable');
+    initSearch('entriesSearch', 'entriesTable');
+    initSort('entriesTable');
+});
+</script>
 {% endblock %}
