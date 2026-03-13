@@ -74,9 +74,9 @@
                 </div>
             </div>
         </div>
-        <div class="table-responsive">
+        <div style="min-height: 350px; max-height: 520px; overflow-y: auto;">
             <table class="table table-striped align-middle" id="reportTable">
-                <thead>
+                <thead class="table-dark sticky-top">
                     <tr>
                         <th data-sortable data-sort-type="text">Project ID <span class="sort-indicator"></span></th>
                         <th data-sortable data-sort-type="text">Project Name <span class="sort-indicator"></span></th>
@@ -100,10 +100,10 @@
                     </tr>
                     {% endfor %}
                 </tbody>
-                <tfoot class="table-light fw-bold">
+                <tfoot class="table-light fw-bold" id="reportTfoot" style="position: sticky; bottom: 0;">
                     <tr>
                         <td colspan="2">Total</td>
-                        <td class="text-end">{{ "%.2f"|format(report_data | sum(attribute='hours_billed')) }}</td>
+                        <td></td>
                         <td></td>
                         <td class="text-end">${{ "%.2f"|format(report_data | sum(attribute='direct_commission')) }}</td>
                         <td class="text-end">${{ "%.2f"|format(report_data | sum(attribute='override_commission')) }}</td>
@@ -149,6 +149,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 var text = row.textContent.toLowerCase();
                 row.style.display = text.includes(term) ? '' : 'none';
             });
+            var tfoot = document.getElementById('reportTfoot');
+            if (tfoot) tfoot.style.display = term ? 'none' : '';
         });
     }
 

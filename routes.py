@@ -115,7 +115,7 @@ def index():
 
         # Only fetch projects this employee is actually assigned to, scoped to company
         projects = Project.query.options(
-            joinedload(Project.project_staff)
+            joinedload(Project.project_staff).joinedload(ProjectStaff.employee)
         ).join(ProjectStaff).filter(
             Project.company_id == current_user.company_id,
             ProjectStaff.employee_id == employee_id
@@ -160,23 +160,42 @@ def index():
                 for eid, ps in staff_map.items()
             )
 
-            # Commission calculation
-            if emp.role.lower() == 'associate':
+            # Associate-specific aggregates for non-associate commission basis
+            total_assoc_hours = sum(
+                emp_hours_map.get(eid, 0)
+                for eid, ps in staff_map.items()
+                if ps.employee and ps.employee.role.lower() == 'associate'
+            )
+            total_assoc_revenue = sum(
+                emp_hours_map.get(eid, 0) * (ps.hourly_rate or 0)
+                for eid, ps in staff_map.items()
+                if ps.employee and ps.employee.role.lower() == 'associate'
+            )
+
+            # Commission calculation with correct display hours/revenue per role
+            role = emp.role.lower()
+            if role == 'associate':
                 direct_comm = revenue * (staff.commission_percentage or 0) / 100
                 override_comm = 0
+                display_hours = hours
+                display_revenue = revenue
                 note = "Associate: own hours commission"
-            elif emp.role.lower() == 'director':
+            elif role == 'director':
                 direct_comm = revenue * (staff.commission_percentage or 0) / 100
                 override_comm = (total_project_revenue * employee.override_percentage / 100) if employee.override_percentage else 0
+                display_hours = sum(emp_hours_map.get(eid, 0) for eid in staff_map)
+                display_revenue = total_project_revenue
                 note = "Director: direct + 2% override"
             else:
-                direct_comm = total_project_revenue * (staff.commission_percentage or 0) / 100
+                direct_comm = total_assoc_revenue * (staff.commission_percentage or 0) / 100
                 override_comm = 0
+                display_hours = total_assoc_hours
+                display_revenue = total_assoc_revenue
                 note = "Other: % of associate revenue"
 
             app.logger.debug(
-                f"Project {project.name} — role={emp.role}, hours={hours}, "
-                f"revenue={revenue}, direct_comm={direct_comm}, override_comm={override_comm}"
+                f"Project {project.name} — role={emp.role}, hours={display_hours}, "
+                f"revenue={display_revenue}, direct_comm={direct_comm}, override_comm={override_comm}"
             )
 
             direct_commission += direct_comm
@@ -184,7 +203,7 @@ def index():
             report_data.append({
                 "project_number": project.project_id,
                 "project_name": project.name,
-                "hours_billed": hours,
+                "hours_billed": display_hours,
                 "bill_rate": staff.hourly_rate or 0,
                 "direct_commission": direct_comm,
                 "override_commission": override_comm,
@@ -258,21 +277,41 @@ def dashboard():
             emp_revenue[entry.employee_id] = emp_revenue.get(entry.employee_id, 0) + revenue
             total_project_revenue += revenue
 
+        # Associate-specific aggregates for non-associate commission basis
+        total_assoc_hours = sum(
+            emp_hours.get(emp_id, 0)
+            for emp_id, s in staff_map.items()
+            if s.employee and s.employee.role.lower() == 'associate'
+        )
+        total_assoc_revenue = sum(
+            emp_revenue.get(emp_id, 0)
+            for emp_id, s in staff_map.items()
+            if s.employee and s.employee.role.lower() == 'associate'
+        )
+        total_project_hours = sum(emp_hours.get(emp_id, 0) for emp_id in staff_map)
+
         for emp_id, staff in staff_map.items():
             employee = staff.employee
             hours = emp_hours.get(emp_id, 0)
             revenue = emp_revenue.get(emp_id, 0)
             commission = 0.0
 
-            if employee.role.lower() == 'associate':
+            role = employee.role.lower()
+            if role == 'associate':
                 direct_comm = revenue * (staff.commission_percentage or 0) / 100
                 override_comm = 0
-            elif employee.role.lower() == 'director':
+                display_hours = hours
+                display_revenue = revenue
+            elif role == 'director':
                 direct_comm = revenue * (staff.commission_percentage or 0) / 100
                 override_comm = (total_project_revenue * employee.override_percentage / 100) if employee.override_percentage else 0
+                display_hours = total_project_hours
+                display_revenue = total_project_revenue
             else:
-                direct_comm = total_project_revenue * (staff.commission_percentage or 0) / 100
+                direct_comm = total_assoc_revenue * (staff.commission_percentage or 0) / 100
                 override_comm = 0
+                display_hours = total_assoc_hours
+                display_revenue = total_assoc_revenue
 
             commission = direct_comm + override_comm
 
@@ -288,11 +327,11 @@ def dashboard():
                 }
 
             summary = employee_summary[emp_id]
-            summary['total_hours'] += hours
-            summary['total_revenue'] += revenue
+            summary['total_hours'] += display_hours
+            summary['total_revenue'] += display_revenue
             summary['total_commission'] += commission
             summary['notes'].add(employee.role)
-            summary['by_project'].append({"project": project.name, "hours": hours, "revenue": revenue, "commission": commission})
+            summary['by_project'].append({"project": project.name, "hours": display_hours, "revenue": display_revenue, "commission": commission})
 
         app.logger.debug(f"Processed project: {project.name}")
 

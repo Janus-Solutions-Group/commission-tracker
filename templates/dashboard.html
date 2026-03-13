@@ -35,10 +35,18 @@
     </div>
 </div>
 
-
+<!-- Table area loader -->
+<div id="dashboardLoader" class="card d-none mb-5">
+    <div class="card-body text-center py-5">
+        <div class="spinner-border text-primary mb-3" style="width:2.5rem;height:2.5rem;" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="text-muted mb-0">Generating report…</p>
+    </div>
+</div>
 
 <!-- Employee Performance -->
-<div class="row mb-5">
+<div class="row mb-5" id="dashboardContent">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
@@ -98,11 +106,11 @@
                         </tr>
                         {% endfor %}
             </tbody>
-            <tfoot class="table-light fw-bold" style="position: sticky; bottom: 0;">
+            <tfoot class="table-light fw-bold" id="dashboardTfoot" style="position: sticky; bottom: 0;">
                 <tr>
                     <td class="text-end">Total</td>
-                    <td class="text-end">{{ "%.2f"|format(report_data | sum(attribute='total_hours')) }}</td>
-                    <td class="text-end">${{ "%.2f"|format(report_data | sum(attribute='total_revenue')) }}</td>
+                    <td></td>
+                    <td></td>
                     <td class="text-end text-success">${{ "%.2f"|format(report_data | sum(attribute='total_commission')) }}</td>
                     <td></td>
                 </tr>
@@ -196,6 +204,16 @@ function openProjectDrawer(btn) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    var form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function() {
+            var content = document.getElementById('dashboardContent');
+            var loader = document.getElementById('dashboardLoader');
+            if (content) content.classList.add('d-none');
+            loader.classList.remove('d-none');
+        });
+    }
+
     // Client-side search
     var searchInput = document.getElementById('dashboardSearch');
     if (searchInput) {
@@ -207,6 +225,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 var text = row.textContent.toLowerCase();
                 row.style.display = text.includes(term) ? '' : 'none';
             });
+            var tfoot = document.getElementById('dashboardTfoot');
+            if (tfoot) tfoot.style.display = term ? 'none' : '';
         });
     }
 
