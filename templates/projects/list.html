@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "components/table_controls.html" import search_bar, sort_header %}
+{% from "components/excel_modal.html" import excel_modal %}
 
 {% block title %}Projects - Commission Tracker{% endblock %}
 
@@ -14,12 +15,23 @@
             Create, manage, and monitor projects with real-time tracking of hours, revenue, and team assignments.
         </p>
     </div>
-    <div class="col-auto">
+    <div class="col-auto d-flex gap-2">
+        <button class="btn btn-outline-primary d-flex align-items-center gap-1"
+                data-bs-toggle="modal" data-bs-target="#excelModal-projects">
+            <i data-feather="file-text" style="width:16px;height:16px;"></i> Import / Export
+        </button>
         <a href="{{ url_for('projects_new') }}" class="btn btn-primary">
             <i data-feather="plus" class="me-1"></i> Create New Project
         </a>
     </div>
 </div>
+
+{{ excel_modal(
+    'projects',
+    url_for('projects_import'),
+    url_for('projects_sample'),
+    url_for('projects_export')
+) }}
 
 <div class="card">
     <div class="card-body">

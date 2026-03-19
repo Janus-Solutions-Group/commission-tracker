@@ -49,11 +49,15 @@
 <div class="row mb-5" id="dashboardContent">
     <div class="col-12">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex align-items-center justify-content-between">
                 <h5 class="card-title mb-0">
                     <i data-feather="users"></i>
                     Employee Performance
                 </h5>
+                <a href="{{ export_url }}" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
+                   onclick="excelDownloadBtn(this)">
+                    <i data-feather="download" style="width:14px;height:14px;"></i> Export Excel
+                </a>
             </div>
             <div class="card-body">
             {% if report_data %}
@@ -106,17 +110,23 @@
                         </tr>
                         {% endfor %}
             </tbody>
+            {% set ns = namespace(assoc_hours=0.0, assoc_revenue=0.0) %}
+            {% for entry in report_data %}{% if entry.employee.role == 'Associate' %}{% set ns.assoc_hours = ns.assoc_hours + entry.total_hours %}{% set ns.assoc_revenue = ns.assoc_revenue + entry.total_revenue %}{% endif %}{% endfor %}
             <tfoot class="table-light fw-bold" id="dashboardTfoot" style="position: sticky; bottom: 0;">
                 <tr>
                     <td class="text-end">Total</td>
-                    <td></td>
-                    <td></td>
+                    <td class="text-end">{{ "%.2f"|format(ns.assoc_hours) }}</td>
+                    <td class="text-end">${{ "%.2f"|format(ns.assoc_revenue) }}</td>
                     <td class="text-end text-success">${{ "%.2f"|format(report_data | sum(attribute='total_commission')) }}</td>
                     <td></td>
                 </tr>
             </tfoot>
         </table>
             </div>
+            <p class="text-muted small mt-2 mb-0">
+                <i data-feather="info" style="width:13px;height:13px;"></i>
+                <em>Hours and revenue totals reflect Associate billed hours only — Director, PM, Analyst, and Consultant hours are excluded. Commission is the combined total for all roles.</em>
+            </p>
             {% else %}
 
                 <div class="text-center py-5">
@@ -148,6 +158,22 @@
 
 {% block scripts %}
 <script>
+function excelDownloadBtn(el) {
+    if (el.dataset.busy === '1') return;
+    el.dataset.busy = '1';
+    var orig = el.innerHTML;
+    el.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Downloading…';
+    el.style.pointerEvents = 'none';
+    el.style.opacity = '0.65';
+    setTimeout(function() {
+        el.innerHTML = orig;
+        el.style.pointerEvents = '';
+        el.style.opacity = '';
+        delete el.dataset.busy;
+        feather.replace();
+    }, 4000);
+}
+
 function openProjectDrawer(btn) {
     var name = btn.getAttribute('data-employee-name');
     var role = btn.getAttribute('data-employee-role');

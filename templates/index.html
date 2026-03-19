@@ -47,15 +47,26 @@
 <div class="card" id="reportCard">
     <div class="card-body">
 
-        <h5 class="card-title">Commission Report: {{ employee.name }}</h5>
-        <p class="card-subtitle text-muted mb-3">
-            {{ employee.role }} &mdash;
-            <strong>Total Commission:</strong> ${{ "%.2f"|format(direct_commission) }}
-            {% if override_commission %}
-                | <strong>Override:</strong> ${{ "%.2f"|format(override_commission) }}
-                | <strong>Grand Total:</strong> ${{ "%.2f"|format(direct_commission + override_commission) }}
+        <div class="d-flex align-items-start justify-content-between mb-2">
+            <div>
+                <h5 class="card-title mb-1">Commission Report: {{ employee.name }}</h5>
+                <p class="card-subtitle text-muted mb-0">
+                    {{ employee.role }} &mdash;
+                    <strong>Total Commission:</strong> ${{ "%.2f"|format(direct_commission) }}
+                    {% if override_commission %}
+                        | <strong>Override:</strong> ${{ "%.2f"|format(override_commission) }}
+                        | <strong>Grand Total:</strong> ${{ "%.2f"|format(direct_commission + override_commission) }}
+                    {% endif %}
+                </p>
+            </div>
+            {% if export_url %}
+            <a href="{{ export_url }}" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1 ms-3 flex-shrink-0"
+               style="white-space: nowrap;" onclick="excelDownloadBtn(this)">
+                <i data-feather="download" style="width:14px;height:14px;"></i> Export Excel
+            </a>
             {% endif %}
-        </p>
+        </div>
+        <hr class="my-3">
 
         {% if report_data %}
         <div class="mb-3">
@@ -103,7 +114,7 @@
                 <tfoot class="table-light fw-bold" id="reportTfoot" style="position: sticky; bottom: 0;">
                     <tr>
                         <td colspan="2">Total</td>
-                        <td></td>
+                        <td class="text-end">{{ "%.2f"|format(report_data | sum(attribute='hours_billed')) }}</td>
                         <td></td>
                         <td class="text-end">${{ "%.2f"|format(report_data | sum(attribute='direct_commission')) }}</td>
                         <td class="text-end">${{ "%.2f"|format(report_data | sum(attribute='override_commission')) }}</td>
@@ -112,6 +123,10 @@
                 </tfoot>
             </table>
         </div>
+        <p class="text-muted small mt-2 mb-0">
+            <i data-feather="info" style="width:13px;height:13px;"></i>
+            <em>Hours Billed reflects the hours used to calculate this employee's commission: Associates show their own billed hours; Directors show total project hours; PMs, Analysts, and Consultants show Associate billed hours only. Commission total includes all commission types.</em>
+        </p>
         {% else %}
         <div class="text-center py-5">
             <i data-feather="bar-chart-2" style="width: 64px; height: 64px;" class="text-muted mb-3"></i>
@@ -127,6 +142,22 @@
 
 {% block scripts %}
 <script>
+function excelDownloadBtn(el) {
+    if (el.dataset.busy === '1') return;
+    el.dataset.busy = '1';
+    var orig = el.innerHTML;
+    el.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Downloading…';
+    el.style.pointerEvents = 'none';
+    el.style.opacity = '0.65';
+    setTimeout(function() {
+        el.innerHTML = orig;
+        el.style.pointerEvents = '';
+        el.style.opacity = '';
+        delete el.dataset.busy;
+        feather.replace();
+    }, 4000);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     var form = document.querySelector('form');
     if (form) {

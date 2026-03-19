@@ -11,12 +11,15 @@ cryptography==37.0.4
 dnspython==2.7.0
 durationpy==0.10
 email_validator==2.2.0
+et_xmlfile==2.0.0
 Flask==3.1.1
 Flask-Dance==7.1.0
+Flask-DebugToolbar==0.16.0
 Flask-JWT-Extended==4.7.1
 Flask-Login==0.6.3
 Flask-SQLAlchemy==3.1.1
 Flask-WTF==1.2.2
+fuzzywuzzy==0.18.0
 greenlet==3.2.3
 hjson==3.1.0
 idna==3.10
@@ -27,7 +30,9 @@ jwt==1.4.0
 kappa==0.6.0
 MarkupSafe==3.0.2
 oauthlib==3.3.1
+openpyxl==3.1.5
 placebo==0.9.0
+psycopg2-binary==2.9.10
 pycparser==2.22
 PyJWT==2.10.1
 python-dateutil==2.9.0.post0
@@ -49,4 +54,4 @@ URLObject==2.4.3
 Werkzeug==3.1.3
 wheel==0.45.1
 WTForms==3.2.1
-zappa==0.60.2
+zappa==0.62.1

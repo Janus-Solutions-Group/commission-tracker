@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "components/table_controls.html" import search_bar, sort_header %}
+{% from "components/excel_modal.html" import excel_modal %}
 
 {% block title %}Employees - Commission Tracker{% endblock %}
 
@@ -14,12 +15,23 @@
             Add, manage, and configure employee roles, rates, and commission structures for seamless tracking and payouts.
         </p>
     </div>
-    <div class="col-auto">
+    <div class="col-auto d-flex gap-2">
+        <button class="btn btn-outline-primary d-flex align-items-center gap-1"
+                data-bs-toggle="modal" data-bs-target="#excelModal-employees">
+            <i data-feather="file-text" style="width:16px;height:16px;"></i> Import / Export
+        </button>
         <a href="{{ url_for('employees_new') }}" class="btn btn-primary">
             <i data-feather="user-plus" class="me-1"></i> Add New Employee
         </a>
     </div>
 </div>
+
+{{ excel_modal(
+    'employees',
+    url_for('employees_import'),
+    url_for('employees_sample'),
+    url_for('employees_export')
+) }}
 
 <div class="card">
     <div class="card-body">

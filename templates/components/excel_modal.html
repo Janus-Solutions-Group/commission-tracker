@@ -1,0 +1,190 @@
+{% macro excel_modal(entity, import_url, sample_url, export_url) %}
+<!-- Import/Export Modal for {{ entity }} -->
+<div class="modal fade" id="excelModal-{{ entity }}" tabindex="-1" aria-labelledby="excelModalLabel-{{ entity }}" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: var(--radius-lg); border: none; box-shadow: 0 20px 60px rgba(44,50,242,0.18);">
+            <div class="modal-header border-0 pb-0" style="padding: 1.5rem 1.5rem 0.5rem;">
+                <h5 class="modal-title fw-bold d-flex align-items-center gap-2" id="excelModalLabel-{{ entity }}">
+                    <i data-feather="file-text" style="width:20px;height:20px;color:var(--primary);"></i>
+                    Import / Export Excel
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="padding: 1rem 1.5rem 1.5rem;">
+                <!-- Tabs -->
+                <ul class="nav nav-pills mb-4 gap-1" id="excelTab-{{ entity }}" role="tablist"
+                    style="background: var(--background-secondary); border-radius: var(--radius); padding: 4px;">
+                    <li class="nav-item flex-fill" role="presentation">
+                        <button class="nav-link active w-100 fw-500" id="import-tab-{{ entity }}"
+                                data-bs-toggle="tab" data-bs-target="#importPane-{{ entity }}"
+                                type="button" role="tab"
+                                style="border-radius: calc(var(--radius) - 2px); font-size: 0.9rem; padding: 0.5rem 1rem;">
+                            <i data-feather="upload" style="width:14px;height:14px;" class="me-1"></i> Import
+                        </button>
+                    </li>
+                    <li class="nav-item flex-fill" role="presentation">
+                        <button class="nav-link w-100 fw-500" id="export-tab-{{ entity }}"
+                                data-bs-toggle="tab" data-bs-target="#exportPane-{{ entity }}"
+                                type="button" role="tab"
+                                style="border-radius: calc(var(--radius) - 2px); font-size: 0.9rem; padding: 0.5rem 1rem;">
+                            <i data-feather="download" style="width:14px;height:14px;" class="me-1"></i> Export
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="excelTabContent-{{ entity }}">
+
+                    <!-- Import Tab -->
+                    <div class="tab-pane fade show active" id="importPane-{{ entity }}" role="tabpanel">
+                        <form method="POST" action="{{ import_url }}" enctype="multipart/form-data" id="importForm-{{ entity }}">
+
+                            <!-- Dropzone -->
+                            <div id="dropzone-{{ entity }}"
+                                 class="dropzone-area"
+                                 onclick="document.getElementById('fileInput-{{ entity }}').click()"
+                                 ondragover="event.preventDefault(); this.classList.add('dz-dragover')"
+                                 ondragleave="this.classList.remove('dz-dragover')"
+                                 ondrop="dzHandleDrop(event, '{{ entity }}')">
+                                <i data-feather="upload-cloud" class="dz-icon text-muted"></i>
+                                <p class="mb-1 fw-500">Drop your Excel file here</p>
+                                <p class="text-muted small mb-0">or <span class="text-primary fw-500">click to browse</span> — .xlsx / .xls</p>
+                                <div id="dz-fname-{{ entity }}" class="mt-3 d-none">
+                                    <span class="badge" style="background: rgba(44,50,242,0.12); color: var(--primary); font-size: 0.85rem; padding: 0.4rem 0.8rem; border-radius: 50px;">
+                                        <i data-feather="file" style="width:12px;height:12px;" class="me-1"></i>
+                                        <span id="dz-fname-text-{{ entity }}"></span>
+                                    </span>
+                                </div>
+                            </div>
+                            <input type="file" id="fileInput-{{ entity }}" name="file"
+                                   accept=".xlsx,.xls" class="d-none"
+                                   onchange="dzShowFile('{{ entity }}', this)">
+
+                            <div class="d-flex align-items-center justify-content-between mt-3 pt-2">
+                                <a href="{{ sample_url }}" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1"
+                                   style="font-size: 0.85rem;"
+                                   onclick="excelDownloadBtn(this)">
+                                    <i data-feather="download" style="width:13px;height:13px;"></i>
+                                    Download Sample
+                                </a>
+                                <button type="submit" class="btn btn-primary btn-sm px-4"
+                                        id="importBtn-{{ entity }}" disabled
+                                        onclick="excelImportBtn(this)">
+                                    <i data-feather="upload" style="width:13px;height:13px;" class="me-1"></i>
+                                    Import
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Export Tab -->
+                    <div class="tab-pane fade" id="exportPane-{{ entity }}" role="tabpanel">
+                        <div class="text-center py-3">
+                            <div class="mb-4">
+                                <i data-feather="file-text" style="width:56px;height:56px;color:var(--primary);opacity:0.7;"></i>
+                                <h6 class="mt-3 fw-600">Export All Data</h6>
+                                <p class="text-muted small">Download all records as an Excel spreadsheet.</p>
+                            </div>
+                            <a href="{{ export_url }}" class="btn btn-primary px-5 d-inline-flex align-items-center gap-2"
+                               onclick="excelDownloadBtn(this)">
+                                <i data-feather="download" style="width:16px;height:16px;"></i>
+                                Download Excel
+                            </a>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.dropzone-area {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 2rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    background: var(--background);
+    user-select: none;
+}
+.dropzone-area:hover,
+.dropzone-area.dz-dragover {
+    border-color: var(--primary);
+    background: rgba(44, 50, 242, 0.04);
+}
+.dz-icon {
+    width: 48px !important;
+    height: 48px !important;
+    margin-bottom: 0.75rem;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+.nav-pills .nav-link.active {
+    background: white;
+    color: var(--primary) !important;
+    box-shadow: 0 2px 8px rgba(44,50,242,0.12);
+}
+.nav-pills .nav-link:not(.active) {
+    color: var(--text-light);
+    background: transparent;
+}
+</style>
+
+<script>
+function dzShowFile(entity, input) {
+    var fname = input.files[0] ? input.files[0].name : null;
+    var badge = document.getElementById('dz-fname-' + entity);
+    var text = document.getElementById('dz-fname-text-' + entity);
+    var btn = document.getElementById('importBtn-' + entity);
+    if (fname) {
+        text.textContent = fname;
+        badge.classList.remove('d-none');
+        btn.disabled = false;
+    } else {
+        badge.classList.add('d-none');
+        btn.disabled = true;
+    }
+    feather.replace();
+}
+function dzHandleDrop(event, entity) {
+    event.preventDefault();
+    document.getElementById('dropzone-' + entity).classList.remove('dz-dragover');
+    var files = event.dataTransfer.files;
+    if (files.length > 0) {
+        var input = document.getElementById('fileInput-' + entity);
+        var dt = new DataTransfer();
+        dt.items.add(files[0]);
+        input.files = dt.files;
+        dzShowFile(entity, input);
+    }
+}
+
+/* Disable an export/sample link while the download triggers, re-enable after 4s */
+function excelDownloadBtn(el) {
+    if (el.dataset.busy === '1') return;
+    el.dataset.busy = '1';
+    var orig = el.innerHTML;
+    el.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Downloading…';
+    el.style.pointerEvents = 'none';
+    el.style.opacity = '0.65';
+    setTimeout(function() {
+        el.innerHTML = orig;
+        el.style.pointerEvents = '';
+        el.style.opacity = '';
+        delete el.dataset.busy;
+        feather.replace();
+    }, 4000);
+}
+
+/* Disable the import submit button and show a spinner; page reloads on completion */
+function excelImportBtn(btn) {
+    setTimeout(function() {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Importing…';
+    }, 0);
+}
+</script>
+{% endmacro %}

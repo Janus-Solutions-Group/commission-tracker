@@ -1,4 +1,6 @@
-from flask import render_template, request, redirect, url_for, flash, jsonify
+import io
+from datetime import datetime
+from flask import render_template, request, redirect, url_for, flash, jsonify, send_file
 from flask_login import login_user, logout_user, current_user, login_required
 from urllib.parse import urlparse
 from app import app, db
@@ -8,6 +10,36 @@ from utils import get_paginated_query, is_admin_email
 from sqlalchemy.orm import joinedload, subqueryload, contains_eager
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_, func, and_
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+
+
+def _make_excel_response(wb, filename):
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
+def _style_header_row(ws):
+    header_font = Font(bold=True, color='FFFFFF')
+    header_fill = PatternFill(start_color='2c32f2', end_color='2c32f2', fill_type='solid')
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+    ws.row_dimensions[1].height = 22
+
+
+def _auto_width(ws):
+    for col in ws.columns:
+        max_len = max((len(str(cell.value or '')) for cell in col), default=10)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
 # Authentication routes
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -215,6 +247,15 @@ def index():
         f"override_commission={override_commission}, total={direct_commission + override_commission}"
     )
 
+    export_url = None
+    if employee and report_data:
+        export_url = url_for(
+            'commission_export',
+            employee_id=employee.id,
+            date_from=form.date_from.data.strftime('%Y-%m-%d') if form.date_from.data else '',
+            date_to=form.date_to.data.strftime('%Y-%m-%d') if form.date_to.data else '',
+        )
+
     return render_template(
         'index.html',
         form=form,
@@ -222,7 +263,8 @@ def index():
         employee=employee,
         direct_commission=direct_commission,
         override_commission=override_commission,
-        total_commission=direct_commission + override_commission
+        total_commission=direct_commission + override_commission,
+        export_url=export_url,
     )
 
 
@@ -348,7 +390,13 @@ def dashboard():
 
     app.logger.info(f"Dashboard report generated with {len(report_data)} employees summarised")
 
-    return render_template('dashboard.html', form=form, report_data=report_data)
+    dashboard_export_url = url_for(
+        'dashboard_export',
+        date_from=date_from.strftime('%Y-%m-%d') if date_from else '',
+        date_to=date_to.strftime('%Y-%m-%d') if date_to else '',
+    )
+
+    return render_template('dashboard.html', form=form, report_data=report_data, export_url=dashboard_export_url)
 
 
 # Projects routes
@@ -909,6 +957,516 @@ def internal_error(error):
     app.logger.error(f"[500 Internal Error] URL: {request.path} | Method: {request.method} | Error: {error}", exc_info=True)
     db.session.rollback()
     return render_template('500.html'), 500
+
+
+# ─── Excel Export / Import / Sample Routes ────────────────────────────────────
+
+# --- Projects ---
+
+@app.route('/projects/export')
+@login_required
+def projects_export():
+    projects = Project.query.filter_by(company_id=current_user.company_id).order_by(Project.name).all()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Projects'
+    ws.append(['Project ID', 'Name', 'Client', 'Start Date', 'End Date', 'Total Allocated Hours', 'Extra Hours'])
+    _style_header_row(ws)
+    for p in projects:
+        ws.append([
+            p.project_id, p.name, p.client,
+            p.start_date.strftime('%Y-%m-%d') if p.start_date else '',
+            p.end_date.strftime('%Y-%m-%d') if p.end_date else '',
+            float(p.total_allocated_hours or 0),
+            float(p.extra_hours or 0),
+        ])
+    _auto_width(ws)
+    return _make_excel_response(wb, 'projects.xlsx')
+
+
+@app.route('/projects/sample')
+@login_required
+def projects_sample():
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Projects'
+    ws.append(['Project ID', 'Name', 'Client', 'Start Date', 'End Date', 'Total Allocated Hours', 'Extra Hours'])
+    _style_header_row(ws)
+    ws.append(['P001', 'Sample Project', 'Acme Corp', '2024-01-01', '2024-12-31', 1000.0, 100.0])
+    _auto_width(ws)
+    return _make_excel_response(wb, 'projects_sample.xlsx')
+
+
+@app.route('/projects/import', methods=['POST'])
+@login_required
+def projects_import():
+    f = request.files.get('file')
+    if not f or not f.filename:
+        flash('No file selected.', 'error')
+        return redirect(url_for('projects_list'))
+    try:
+        wb = load_workbook(f, read_only=True)
+        ws = wb.active
+        rows = list(ws.iter_rows(min_row=2, values_only=True))
+        created, errors = 0, []
+        for i, row in enumerate(rows, start=2):
+            row = list(row) + [None] * 7
+            project_id, name, client, start_date, end_date, allocated_hours, extra_hours = row[:7]
+            if not project_id or not name or not client:
+                errors.append(f'Row {i}: Missing required fields (Project ID, Name, Client).')
+                continue
+            try:
+                sd = datetime.strptime(str(start_date).strip(), '%Y-%m-%d').date() if start_date else None
+                ed = datetime.strptime(str(end_date).strip(), '%Y-%m-%d').date() if end_date else None
+                db.session.add(Project(
+                    project_id=str(project_id).strip(), name=str(name).strip(), client=str(client).strip(),
+                    start_date=sd, end_date=ed,
+                    total_allocated_hours=float(allocated_hours or 0),
+                    extra_hours=float(extra_hours or 0),
+                    company_id=current_user.company_id,
+                ))
+                created += 1
+            except Exception as e:
+                errors.append(f'Row {i}: {e}')
+        db.session.commit()
+        if created:
+            flash(f'Imported {created} project(s) successfully.', 'success')
+        for err in errors[:5]:
+            flash(err, 'error')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Import failed: {e}', 'error')
+    return redirect(url_for('projects_list'))
+
+
+# --- Employees ---
+
+@app.route('/employees/export')
+@login_required
+def employees_export():
+    employees = Employee.query.filter_by(company_id=current_user.company_id).order_by(Employee.name).all()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Employees'
+    ws.append(['Name', 'Role', 'Hourly Rate', 'Override Percentage'])
+    _style_header_row(ws)
+    for e in employees:
+        ws.append([e.name, e.role, float(e.hourly_rate or 0), float(e.override_percentage or 0)])
+    _auto_width(ws)
+    return _make_excel_response(wb, 'employees.xlsx')
+
+
+@app.route('/employees/sample')
+@login_required
+def employees_sample():
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Employees'
+    ws.append(['Name', 'Role', 'Hourly Rate', 'Override Percentage'])
+    _style_header_row(ws)
+    ws.append(['Jane Smith', 'Associate', 75.0, 0.0])
+    ws.append(['John Director', 'Director', 120.0, 2.0])
+    ws.append(['Alice PM', 'PM', 90.0, 0.0])
+    _auto_width(ws)
+    return _make_excel_response(wb, 'employees_sample.xlsx')
+
+
+@app.route('/employees/import', methods=['POST'])
+@login_required
+def employees_import():
+    f = request.files.get('file')
+    if not f or not f.filename:
+        flash('No file selected.', 'error')
+        return redirect(url_for('employees_list'))
+    valid_roles = {'Associate', 'Director', 'PM', 'Analyst', 'Consultant'}
+    try:
+        wb = load_workbook(f, read_only=True)
+        ws = wb.active
+        rows = list(ws.iter_rows(min_row=2, values_only=True))
+        created, errors = 0, []
+        for i, row in enumerate(rows, start=2):
+            row = list(row) + [None] * 4
+            name, role, hourly_rate, override_pct = row[:4]
+            if not name or not role:
+                errors.append(f'Row {i}: Missing required fields (Name, Role).')
+                continue
+            role = str(role).strip()
+            if role not in valid_roles:
+                errors.append(f'Row {i}: Invalid role "{role}". Must be one of: {", ".join(valid_roles)}.')
+                continue
+            try:
+                override = float(override_pct or 0) if role == 'Director' else 0.0
+                db.session.add(Employee(
+                    name=str(name).strip(), role=role,
+                    hourly_rate=float(hourly_rate or 0), override_percentage=override,
+                    company_id=current_user.company_id,
+                ))
+                created += 1
+            except Exception as e:
+                errors.append(f'Row {i}: {e}')
+        db.session.commit()
+        if created:
+            flash(f'Imported {created} employee(s) successfully.', 'success')
+        for err in errors[:5]:
+            flash(err, 'error')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Import failed: {e}', 'error')
+    return redirect(url_for('employees_list'))
+
+
+# --- Project Staff ---
+
+@app.route('/project-staff/export')
+@login_required
+def project_staff_export():
+    assignments = ProjectStaff.query.join(Project).join(Employee).options(
+        contains_eager(ProjectStaff.project), contains_eager(ProjectStaff.employee),
+    ).filter(Project.company_id == current_user.company_id).order_by(Employee.name).all()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Project Staff'
+    ws.append(['Employee Name', 'Project Name', 'Commission Percentage', 'Hourly Rate'])
+    _style_header_row(ws)
+    for a in assignments:
+        ws.append([a.employee.name, a.project.name, float(a.commission_percentage or 0), float(a.hourly_rate or 0)])
+    _auto_width(ws)
+    return _make_excel_response(wb, 'project_staff.xlsx')
+
+
+@app.route('/project-staff/sample')
+@login_required
+def project_staff_sample():
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Project Staff'
+    ws.append(['Employee Name', 'Project Name', 'Commission Percentage', 'Hourly Rate'])
+    _style_header_row(ws)
+    ws.append(['Jane Smith', 'Sample Project', 5.0, 75.0])
+    _auto_width(ws)
+    return _make_excel_response(wb, 'project_staff_sample.xlsx')
+
+
+@app.route('/project-staff/import', methods=['POST'])
+@login_required
+def project_staff_import():
+    f = request.files.get('file')
+    if not f or not f.filename:
+        flash('No file selected.', 'error')
+        return redirect(url_for('project_staff_list'))
+    try:
+        wb = load_workbook(f, read_only=True)
+        ws = wb.active
+        rows = list(ws.iter_rows(min_row=2, values_only=True))
+        created, errors = 0, []
+        for i, row in enumerate(rows, start=2):
+            row = list(row) + [None] * 4
+            emp_name, proj_name, commission_pct, hourly_rate = row[:4]
+            if not emp_name or not proj_name:
+                errors.append(f'Row {i}: Missing required fields (Employee Name, Project Name).')
+                continue
+            emp = Employee.query.filter_by(name=str(emp_name).strip(), company_id=current_user.company_id).first()
+            if not emp:
+                errors.append(f'Row {i}: Employee "{emp_name}" not found.')
+                continue
+            proj = Project.query.filter_by(name=str(proj_name).strip(), company_id=current_user.company_id).first()
+            if not proj:
+                errors.append(f'Row {i}: Project "{proj_name}" not found.')
+                continue
+            try:
+                db.session.add(ProjectStaff(
+                    employee_id=emp.id, project_id=proj.id,
+                    commission_percentage=float(commission_pct or 0),
+                    hourly_rate=float(hourly_rate or emp.hourly_rate or 0),
+                    company_id=current_user.company_id,
+                ))
+                created += 1
+            except Exception as e:
+                errors.append(f'Row {i}: {e}')
+        db.session.commit()
+        if created:
+            flash(f'Imported {created} assignment(s) successfully.', 'success')
+        for err in errors[:5]:
+            flash(err, 'error')
+    except IntegrityError:
+        db.session.rollback()
+        flash('Some assignments already exist and were skipped.', 'error')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Import failed: {e}', 'error')
+    return redirect(url_for('project_staff_list'))
+
+
+# --- Hours ---
+
+@app.route('/hours/export')
+@login_required
+def hours_export():
+    entries = HoursEntry.query.join(Project).join(Employee).options(
+        contains_eager(HoursEntry.project), contains_eager(HoursEntry.employee),
+    ).filter(Project.company_id == current_user.company_id).order_by(HoursEntry.date.desc()).all()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Hours'
+    ws.append(['Employee Name', 'Project Name', 'Date', 'Hours Billed', 'Description'])
+    _style_header_row(ws)
+    for e in entries:
+        ws.append([
+            e.employee.name, e.project.name,
+            e.date.strftime('%Y-%m-%d') if e.date else '',
+            float(e.hours_billed or 0),
+            e.description or '',
+        ])
+    _auto_width(ws)
+    return _make_excel_response(wb, 'hours.xlsx')
+
+
+@app.route('/hours/sample')
+@login_required
+def hours_sample():
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Hours'
+    ws.append(['Employee Name', 'Project Name', 'Date', 'Hours Billed', 'Description'])
+    _style_header_row(ws)
+    ws.append(['Jane Smith', 'Sample Project', '2024-01-15', 8.0, 'Design review and implementation'])
+    _auto_width(ws)
+    return _make_excel_response(wb, 'hours_sample.xlsx')
+
+
+@app.route('/hours/import', methods=['POST'])
+@login_required
+def hours_import():
+    f = request.files.get('file')
+    if not f or not f.filename:
+        flash('No file selected.', 'error')
+        return redirect(url_for('hours_list'))
+    try:
+        wb = load_workbook(f, read_only=True)
+        ws = wb.active
+        rows = list(ws.iter_rows(min_row=2, values_only=True))
+        created, errors = 0, []
+        for i, row in enumerate(rows, start=2):
+            row = list(row) + [None] * 5
+            emp_name, proj_name, date_val, hours_billed, description = row[:5]
+            if not emp_name or not proj_name or not date_val:
+                errors.append(f'Row {i}: Missing required fields (Employee Name, Project Name, Date).')
+                continue
+            emp = Employee.query.filter_by(name=str(emp_name).strip(), company_id=current_user.company_id).first()
+            if not emp:
+                errors.append(f'Row {i}: Employee "{emp_name}" not found.')
+                continue
+            proj = Project.query.filter_by(name=str(proj_name).strip(), company_id=current_user.company_id).first()
+            if not proj:
+                errors.append(f'Row {i}: Project "{proj_name}" not found.')
+                continue
+            if not ProjectStaff.query.filter_by(employee_id=emp.id, project_id=proj.id).first():
+                errors.append(f'Row {i}: Employee "{emp_name}" is not assigned to project "{proj_name}".')
+                continue
+            try:
+                if isinstance(date_val, str):
+                    entry_date = datetime.strptime(date_val.strip(), '%Y-%m-%d').date()
+                else:
+                    entry_date = date_val
+                billed = float(hours_billed or 0)
+                db.session.add(HoursEntry(
+                    employee_id=emp.id, project_id=proj.id,
+                    date=entry_date, hours_worked=billed, hours_billed=billed,
+                    description=str(description or '').strip(),
+                    company_id=current_user.company_id,
+                ))
+                created += 1
+            except Exception as e:
+                errors.append(f'Row {i}: {e}')
+        db.session.commit()
+        if created:
+            flash(f'Imported {created} hours entry(s) successfully.', 'success')
+        for err in errors[:5]:
+            flash(err, 'error')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Import failed: {e}', 'error')
+    return redirect(url_for('hours_list'))
+
+
+# --- Commission Report Export ---
+
+@app.route('/commission/export')
+@login_required
+def commission_export():
+    employee_id = request.args.get('employee_id', type=int)
+    date_from_str = request.args.get('date_from', '')
+    date_to_str = request.args.get('date_to', '')
+
+    if not employee_id or not date_from_str or not date_to_str:
+        flash('Missing export parameters.', 'error')
+        return redirect(url_for('index'))
+
+    try:
+        date_from = datetime.strptime(date_from_str, '%Y-%m-%d').date()
+        date_to = datetime.strptime(date_to_str, '%Y-%m-%d').date()
+    except ValueError:
+        flash('Invalid date format.', 'error')
+        return redirect(url_for('index'))
+
+    employee = Employee.query.filter_by(id=employee_id, company_id=current_user.company_id).first_or_404()
+
+    projects = Project.query.options(
+        joinedload(Project.project_staff).joinedload(ProjectStaff.employee)
+    ).join(ProjectStaff).filter(
+        Project.company_id == current_user.company_id,
+        ProjectStaff.employee_id == employee_id
+    ).all()
+
+    project_ids = [p.id for p in projects]
+    all_project_hours = HoursEntry.query.filter(
+        HoursEntry.project_id.in_(project_ids),
+        HoursEntry.date >= date_from, HoursEntry.date <= date_to
+    ).all() if project_ids else []
+
+    project_emp_hours = {}
+    for entry in all_project_hours:
+        project_emp_hours.setdefault(entry.project_id, {})
+        project_emp_hours[entry.project_id][entry.employee_id] = (
+            project_emp_hours[entry.project_id].get(entry.employee_id, 0) + entry.hours_worked
+        )
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Commission Report'
+    ws.append(['Project ID', 'Project Name', 'Hours Billed', 'Bill Rate', 'Direct Commission', 'Override Commission', 'Total Commission'])
+    _style_header_row(ws)
+
+    for project in projects:
+        staff_map = {ps.employee_id: ps for ps in project.project_staff}
+        staff = staff_map.get(employee_id)
+        if not staff:
+            continue
+        emp_hours_map = project_emp_hours.get(project.id, {})
+        hours = emp_hours_map.get(employee_id, 0)
+        revenue = hours * (staff.hourly_rate or 0)
+        total_project_revenue = sum(
+            emp_hours_map.get(eid, 0) * (ps.hourly_rate or 0) for eid, ps in staff_map.items()
+        )
+        total_assoc_revenue = sum(
+            emp_hours_map.get(eid, 0) * (ps.hourly_rate or 0)
+            for eid, ps in staff_map.items()
+            if ps.employee and ps.employee.role.lower() == 'associate'
+        )
+        role = employee.role.lower()
+        if role == 'associate':
+            direct_comm = revenue * (staff.commission_percentage or 0) / 100
+            override_comm = 0
+            display_hours = hours
+        elif role == 'director':
+            direct_comm = revenue * (staff.commission_percentage or 0) / 100
+            override_comm = (total_project_revenue * employee.override_percentage / 100) if employee.override_percentage else 0
+            display_hours = sum(emp_hours_map.get(eid, 0) for eid in staff_map)
+        else:
+            direct_comm = total_assoc_revenue * (staff.commission_percentage or 0) / 100
+            override_comm = 0
+            display_hours = sum(
+                emp_hours_map.get(eid, 0) for eid, ps in staff_map.items()
+                if ps.employee and ps.employee.role.lower() == 'associate'
+            )
+        ws.append([
+            project.project_id, project.name,
+            round(display_hours, 2), round(staff.hourly_rate or 0, 2),
+            round(direct_comm, 2), round(override_comm, 2), round(direct_comm + override_comm, 2),
+        ])
+
+    _auto_width(ws)
+    fname = f'commission_{employee.name.replace(" ", "_")}_{date_from_str}_{date_to_str}.xlsx'
+    return _make_excel_response(wb, fname)
+
+
+# --- Dashboard Export ---
+
+@app.route('/dashboard/export')
+@login_required
+def dashboard_export():
+    date_from_str = request.args.get('date_from', '')
+    date_to_str = request.args.get('date_to', '')
+
+    try:
+        date_from = datetime.strptime(date_from_str, '%Y-%m-%d').date() if date_from_str else None
+        date_to = datetime.strptime(date_to_str, '%Y-%m-%d').date() if date_to_str else None
+    except ValueError:
+        flash('Invalid date format.', 'error')
+        return redirect(url_for('dashboard'))
+
+    projects = Project.query.options(
+        joinedload(Project.project_staff).joinedload(ProjectStaff.employee)
+    ).filter_by(company_id=current_user.company_id).all()
+
+    project_ids = [p.id for p in projects]
+    hours_query = HoursEntry.query.filter(HoursEntry.project_id.in_(project_ids)) if project_ids else HoursEntry.query.filter(False)
+    if date_from:
+        hours_query = hours_query.filter(HoursEntry.date >= date_from)
+    if date_to:
+        hours_query = hours_query.filter(HoursEntry.date <= date_to)
+    all_hours = hours_query.all()
+
+    project_hours_map = {}
+    for entry in all_hours:
+        project_hours_map.setdefault(entry.project_id, []).append(entry)
+
+    employee_summary = {}
+    for project in projects:
+        hours_entries = project_hours_map.get(project.id, [])
+        staff_map = {ps.employee_id: ps for ps in project.project_staff}
+        emp_hours, emp_revenue = {}, {}
+        total_project_revenue = 0
+        for entry in hours_entries:
+            staff = staff_map.get(entry.employee_id)
+            if not staff:
+                continue
+            emp_hours[entry.employee_id] = emp_hours.get(entry.employee_id, 0) + entry.hours_worked
+            revenue = entry.hours_worked * (staff.hourly_rate or 0)
+            emp_revenue[entry.employee_id] = emp_revenue.get(entry.employee_id, 0) + revenue
+            total_project_revenue += revenue
+        total_assoc_revenue = sum(
+            emp_revenue.get(emp_id, 0) for emp_id, s in staff_map.items()
+            if s.employee and s.employee.role.lower() == 'associate'
+        )
+        total_project_hours = sum(emp_hours.get(emp_id, 0) for emp_id in staff_map)
+        for emp_id, staff in staff_map.items():
+            emp = staff.employee
+            hours = emp_hours.get(emp_id, 0)
+            revenue = emp_revenue.get(emp_id, 0)
+            role = emp.role.lower()
+            if role == 'associate':
+                commission = revenue * (staff.commission_percentage or 0) / 100
+                display_hours, display_revenue = hours, revenue
+            elif role == 'director':
+                commission = (revenue * (staff.commission_percentage or 0) / 100 +
+                              ((total_project_revenue * emp.override_percentage / 100) if emp.override_percentage else 0))
+                display_hours, display_revenue = total_project_hours, total_project_revenue
+            else:
+                commission = total_assoc_revenue * (staff.commission_percentage or 0) / 100
+                display_hours = sum(emp_hours.get(eid, 0) for eid, s in staff_map.items() if s.employee and s.employee.role.lower() == 'associate')
+                display_revenue = total_assoc_revenue
+            if emp_id not in employee_summary:
+                employee_summary[emp_id] = {'employee': emp, 'total_hours': 0.0, 'total_revenue': 0.0, 'total_commission': 0.0}
+            employee_summary[emp_id]['total_hours'] += display_hours
+            employee_summary[emp_id]['total_revenue'] += display_revenue
+            employee_summary[emp_id]['total_commission'] += commission
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Dashboard'
+    ws.append(['Employee', 'Role', 'Hours', 'Revenue', 'Commission'])
+    _style_header_row(ws)
+    for s in employee_summary.values():
+        if s['total_revenue'] != 0 or s['total_commission'] != 0:
+            ws.append([
+                s['employee'].name, s['employee'].role,
+                round(s['total_hours'], 2),
+                round(s['total_revenue'], 2),
+                round(s['total_commission'], 2),
+            ])
+    _auto_width(ws)
+    return _make_excel_response(wb, 'dashboard.xlsx')
 
 
 # Static routes

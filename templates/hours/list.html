@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "components/table_controls.html" import search_bar, sort_header %}
+{% from "components/excel_modal.html" import excel_modal %}
 
 {% block title %}Hours Entries - Commission Tracker{% endblock %}
 
@@ -14,12 +15,23 @@
             Log work hours, monitor billed time, and track efficiency across projects and employees.
         </p>
     </div>
-    <div class="col-auto">
+    <div class="col-auto d-flex gap-2">
+        <button class="btn btn-outline-primary d-flex align-items-center gap-1"
+                data-bs-toggle="modal" data-bs-target="#excelModal-hours">
+            <i data-feather="file-text" style="width:16px;height:16px;"></i> Import / Export
+        </button>
         <a href="{{ url_for('hours_new') }}" class="btn btn-primary">
             <i data-feather="plus" class="me-1"></i> Log New Hours
         </a>
     </div>
 </div>
+
+{{ excel_modal(
+    'hours',
+    url_for('hours_import'),
+    url_for('hours_sample'),
+    url_for('hours_export')
+) }}
 
 <div class="card">
     <div class="card-body">
