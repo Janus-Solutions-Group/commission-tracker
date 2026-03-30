@@ -595,7 +595,7 @@ def employees_list():
     app.logger.info(f"[Employees List] Fetching employees for company_id={current_user.company_id}, page={page}, search={search}, sort={sort}, order={order}")
 
     query = Employee.query.options(
-        subqueryload(Employee.project_staff),
+        subqueryload(Employee.project_staff).joinedload(ProjectStaff.project),
     ).filter_by(company_id=current_user.company_id)
 
     if search:

@@ -63,14 +63,25 @@
             {% if report_data %}
             <div class="mb-3">
                 <div class="row g-2 align-items-center">
-                    <div class="col-md-4">
+                    <div class="col-md-5" style="position:relative;">
                         <div class="input-group">
                             <span class="input-group-text bg-white border-end-0">
                                 <i data-feather="search" style="width: 16px; height: 16px;"></i>
                             </span>
                             <input type="text" id="dashboardSearch" class="form-control border-start-0"
-                                   placeholder="Filter employees..." style="padding: 0.5rem 0.75rem;">
+                                   placeholder="Search or select employee..." autocomplete="off"
+                                   style="padding: 0.5rem 0.75rem;">
+                            <button type="button" id="dashboardSearchClear" class="btn btn-outline-secondary d-none" tabindex="-1">
+                                <i data-feather="x" style="width:14px;height:14px;"></i>
+                            </button>
                         </div>
+                        <ul id="dashboardSuggestions" class="list-group shadow-sm"
+                            style="display:none;position:absolute;z-index:1050;left:0;right:0;max-height:220px;overflow-y:auto;top:100%;"></ul>
+                        <datalist id="dashboardEmployeeList">
+                            {% for entry in report_data | sort(attribute='employee.name') if entry.total_revenue != 0 or entry.total_commission != 0 %}
+                            <option data-name="{{ entry.employee.name }}" data-role="{{ entry.employee.role }}" value="{{ entry.employee.name }}">{{ entry.employee.role }}</option>
+                            {% endfor %}
+                        </datalist>
                     </div>
                     <div class="col text-end">
                         <small class="text-muted">Click on a column header to sort</small>
@@ -240,19 +251,86 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Client-side search
+    // Searchable autocomplete filter
     var searchInput = document.getElementById('dashboardSearch');
+    var suggestions = document.getElementById('dashboardSuggestions');
+    var clearBtn = document.getElementById('dashboardSearchClear');
+    var datalist = document.getElementById('dashboardEmployeeList');
+    var employees = datalist ? Array.from(datalist.options).map(function(o) {
+        return { name: o.getAttribute('data-name'), role: o.getAttribute('data-role') };
+    }) : [];
+
+    function filterTable(term, exact) {
+        var t = (term || '').toLowerCase();
+        var table = document.getElementById('dashboardTable');
+        if (!table) return;
+        table.querySelectorAll('tbody tr').forEach(function(row) {
+            var name = (row.querySelector('td strong') || {}).textContent || '';
+            var match = !t || (exact
+                ? name.toLowerCase() === t
+                : row.textContent.toLowerCase().includes(t));
+            row.style.display = match ? '' : 'none';
+        });
+        var tfoot = document.getElementById('dashboardTfoot');
+        if (tfoot) tfoot.style.display = t ? 'none' : '';
+    }
+
+    function showSuggestions(term) {
+        if (!term) { hideSuggestions(); return; }
+        var t = term.toLowerCase();
+        var matches = employees.filter(function(e) {
+            return e.name.toLowerCase().includes(t) || e.role.toLowerCase().includes(t);
+        });
+        if (!matches.length) { hideSuggestions(); return; }
+        suggestions.innerHTML = matches.map(function(e) {
+            var highlighted = e.name.replace(new RegExp('(' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<strong>$1</strong>');
+            return '<li class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" style="cursor:pointer;font-size:0.9rem;" data-value="' + e.name + '">' +
+                '<span>' + highlighted + '</span>' +
+                '<span class="badge bg-secondary ms-2" style="font-size:0.75rem;">' + e.role + '</span>' +
+            '</li>';
+        }).join('');
+        suggestions.style.display = 'block';
+    }
+
+    function hideSuggestions() {
+        suggestions.style.display = 'none';
+        suggestions.innerHTML = '';
+    }
+
     if (searchInput) {
         searchInput.addEventListener('input', function() {
-            var term = this.value.toLowerCase();
-            var table = document.getElementById('dashboardTable');
-            var rows = table.querySelectorAll('tbody tr');
-            rows.forEach(function(row) {
-                var text = row.textContent.toLowerCase();
-                row.style.display = text.includes(term) ? '' : 'none';
-            });
-            var tfoot = document.getElementById('dashboardTfoot');
-            if (tfoot) tfoot.style.display = term ? 'none' : '';
+            var val = this.value;
+            clearBtn.classList.toggle('d-none', !val);
+            filterTable(val);
+            showSuggestions(val);
+        });
+
+        suggestions.addEventListener('mousedown', function(e) {
+            var li = e.target.closest('li[data-value]');
+            if (!li) return;
+            e.preventDefault();
+            searchInput.value = li.getAttribute('data-value');
+            clearBtn.classList.remove('d-none');
+            filterTable(searchInput.value, true);
+            hideSuggestions();
+        });
+
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') { hideSuggestions(); }
+        });
+
+        searchInput.addEventListener('blur', function() {
+            setTimeout(hideSuggestions, 150);
+        });
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            clearBtn.classList.add('d-none');
+            filterTable('');
+            hideSuggestions();
+            searchInput.focus();
         });
     }
 

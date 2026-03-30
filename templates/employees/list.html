@@ -61,7 +61,14 @@
                             <td class="text-end">${{ "%.2f"|format(employee.hourly_rate) }}</td>
                             <td class="text-end">{{ "%.2f"|format(employee.override_percentage) }}%</td>
                             <td class="text-center">
-                                <span class="badge bg-info">{{ employee.project_staff|length }} projects</span>
+                                {% set proj_data = [] %}
+                                {% for ps in employee.project_staff %}{% if ps.project %}{% set _ = proj_data.append({'id': ps.project.id, 'name': ps.project.name, 'client': ps.project.client, 'rate': ps.hourly_rate, 'commission_pct': ps.commission_percentage}) %}{% endif %}{% endfor %}
+                                <button class="btn btn-link p-0 text-decoration-none"
+                                    data-employee="{{ employee.name | e }}"
+                                    data-projects="{{ proj_data | tojson | forceescape }}"
+                                    onclick="openEmployeeProjectsDrawer(this)">
+                                    <span class="badge bg-info">{{ employee.project_staff|length }} projects</span>
+                                </button>
                             </td>
                             <td class="text-end">{{ "%.2f"|format(employee.total_hours_worked) }}</td>
                             <td class="text-center">
@@ -104,4 +111,53 @@
     </div>
 </div>
 
+<!-- Employee Projects Offcanvas Drawer -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="employeeProjectsDrawer" style="width: min(600px, 95vw);">
+    <div class="offcanvas-header border-bottom py-3 px-4">
+        <div>
+            <h5 class="offcanvas-title mb-1" id="empDrawerName"></h5>
+            <small class="text-muted">Project Assignments</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body p-0">
+        <div id="empDrawerContent" class="p-4"></div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openEmployeeProjectsDrawer(btn) {
+    var name = btn.getAttribute('data-employee');
+    var projects = JSON.parse(btn.getAttribute('data-projects'));
+    document.getElementById('empDrawerName').textContent = name;
+    var content = document.getElementById('empDrawerContent');
+    if (!projects || projects.length === 0) {
+        content.innerHTML = '<p class="text-muted">No project assignments found.</p>';
+    } else {
+        var rows = projects.map(function(p) {
+            return '<tr>' +
+                '<td><a href="/projects/' + p.id + '" target="_blank" class="text-decoration-none fw-medium">' + p.name + '</a>' +
+                '<br><small class="text-muted">' + p.client + '</small></td>' +
+                '<td class="text-end">$' + p.rate.toFixed(2) + '</td>' +
+                '<td class="text-end">' + p.commission_pct.toFixed(2) + '%</td>' +
+                '<td class="text-center"><a href="/projects/' + p.id + '" target="_blank" class="btn btn-sm btn-outline-primary"><i data-feather="external-link" style="width:13px;height:13px;"></i></a></td>' +
+            '</tr>';
+        }).join('');
+        content.innerHTML =
+            '<div class="table-responsive">' +
+            '<table class="table table-sm table-striped align-middle mb-0" style="font-size:0.875rem;">' +
+            '<thead class="table-dark">' +
+                '<tr><th>Project</th><th class="text-end" style="min-width:150px;">Rate ($/hr)</th><th class="text-end" style="min-width:150px;">Commission %</th><th class="text-center">View</th></tr>' +
+            '</thead>' +
+            '<tbody>' + rows + '</tbody>' +
+            '</table></div>';
+    }
+    var drawer = bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('employeeProjectsDrawer'));
+    drawer.show();
+    feather.replace();
+}
+</script>
 {% endblock %}
