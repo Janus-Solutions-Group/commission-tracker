@@ -14,6 +14,50 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 
 
+def _compute_entry_financials(employee, project_staff, hours_billed, hours_worked, project_id, exclude_entry_id=None):
+    """Compute revenue and commission for an HoursEntry.
+    Pass exclude_entry_id when editing an existing entry so its old stored revenue
+    is not double-counted in project-level aggregates."""
+    hourly_rate = employee.hourly_rate or 0
+    revenue = hours_billed * hourly_rate
+    commission_pct = (project_staff.commission_percentage or 0) / 100
+    role = employee.role.lower()
+
+    if role == 'associate':
+        commission = hours_worked * hourly_rate * commission_pct
+
+    elif role == 'director':
+        direct = hours_worked * hourly_rate * commission_pct
+        q = db.session.query(func.coalesce(func.sum(HoursEntry.revenue), 0)).filter(
+            HoursEntry.project_id == project_id
+        )
+        if exclude_entry_id:
+            q = q.filter(HoursEntry.id != exclude_entry_id)
+        existing_revenue = q.scalar() or 0.0
+        total_project_revenue = existing_revenue + revenue
+        override = total_project_revenue * (employee.override_percentage or 0) / 100
+        commission = direct + override
+
+    else:
+        associate_ids = db.session.query(Employee.id).join(
+            ProjectStaff, ProjectStaff.employee_id == Employee.id
+        ).filter(
+            ProjectStaff.project_id == project_id,
+            Employee.role.ilike('associate')
+        ).all()
+        associate_ids = [id_ for (id_,) in associate_ids]
+        q = db.session.query(func.coalesce(func.sum(HoursEntry.revenue), 0)).filter(
+            HoursEntry.project_id == project_id,
+            HoursEntry.employee_id.in_(associate_ids)
+        )
+        if exclude_entry_id and employee.id in associate_ids:
+            q = q.filter(HoursEntry.id != exclude_entry_id)
+        total_assoc_revenue = q.scalar() or 0.0
+        commission = total_assoc_revenue * commission_pct
+
+    return revenue, commission
+
+
 def _make_excel_response(wb, filename):
     output = io.BytesIO()
     wb.save(output)
@@ -167,12 +211,17 @@ def index():
             f"{len(project_ids)} projects for employee_id={employee_id}"
         )
 
-        # Map: project_id -> employee_id -> total hours worked
+        # Map: project_id -> employee_id -> {hours, revenue} using stored values
         project_emp_hours = {}
+        project_emp_revenue = {}
         for entry in all_project_hours:
             project_emp_hours.setdefault(entry.project_id, {})
             project_emp_hours[entry.project_id][entry.employee_id] = (
                 project_emp_hours[entry.project_id].get(entry.employee_id, 0) + entry.hours_worked
+            )
+            project_emp_revenue.setdefault(entry.project_id, {})
+            project_emp_revenue[entry.project_id][entry.employee_id] = (
+                project_emp_revenue[entry.project_id].get(entry.employee_id, 0) + (entry.revenue or 0)
             )
 
         for project in projects:
@@ -183,23 +232,21 @@ def index():
 
             emp = employee
             emp_hours_map = project_emp_hours.get(project.id, {})
+            emp_revenue_map = project_emp_revenue.get(project.id, {})
             hours = emp_hours_map.get(employee_id, 0)
-            revenue = hours * (staff.hourly_rate or 0)
+            revenue = emp_revenue_map.get(employee_id, 0)
 
-            # Total project revenue: sum across all staff using their rates
-            total_project_revenue = sum(
-                emp_hours_map.get(eid, 0) * (ps.hourly_rate or 0)
-                for eid, ps in staff_map.items()
-            )
+            # Total project revenue from stored entry values
+            total_project_revenue = sum(emp_revenue_map.values())
 
-            # Associate-specific aggregates for non-associate commission basis
+            # Associate-specific aggregates
             total_assoc_hours = sum(
                 emp_hours_map.get(eid, 0)
                 for eid, ps in staff_map.items()
                 if ps.employee and ps.employee.role.lower() == 'associate'
             )
             total_assoc_revenue = sum(
-                emp_hours_map.get(eid, 0) * (ps.hourly_rate or 0)
+                emp_revenue_map.get(eid, 0)
                 for eid, ps in staff_map.items()
                 if ps.employee and ps.employee.role.lower() == 'associate'
             )
@@ -310,14 +357,12 @@ def dashboard():
         total_project_revenue = 0
 
         for entry in hours_entries:
-            staff = staff_map.get(entry.employee_id)
-            if not staff:
+            if not staff_map.get(entry.employee_id):
                 continue
-
             emp_hours[entry.employee_id] = emp_hours.get(entry.employee_id, 0) + entry.hours_worked
-            revenue = entry.hours_worked * (staff.hourly_rate or 0)
-            emp_revenue[entry.employee_id] = emp_revenue.get(entry.employee_id, 0) + revenue
-            total_project_revenue += revenue
+            entry_rev = entry.revenue or 0
+            emp_revenue[entry.employee_id] = emp_revenue.get(entry.employee_id, 0) + entry_rev
+            total_project_revenue += entry_rev
 
         # Associate-specific aggregates for non-associate commission basis
         total_assoc_hours = sum(
@@ -444,8 +489,8 @@ def projects_list():
 
         revenue_stats = db.session.query(
             HoursEntry.project_id,
-            func.coalesce(func.sum(HoursEntry.hours_billed * Employee.hourly_rate), 0),
-        ).join(Employee).filter(HoursEntry.project_id.in_(project_ids)).group_by(HoursEntry.project_id).all()
+            func.coalesce(func.sum(HoursEntry.revenue), 0),
+        ).filter(HoursEntry.project_id.in_(project_ids)).group_by(HoursEntry.project_id).all()
         revenue_map = {row[0]: row[1] for row in revenue_stats}
 
         for p in projects.items:
@@ -521,46 +566,6 @@ def projects_detail(id):
         HoursEntry.date.desc(), HoursEntry.created_at.desc()
     ).all()
 
-    # Pre-fetch ProjectStaff and pre-compute commission_earned to avoid N+1
-    if hour_entries:
-        pairs = set((e.employee_id, e.project_id) for e in hour_entries)
-        pair_filters = [
-            and_(ProjectStaff.employee_id == eid, ProjectStaff.project_id == pid)
-            for eid, pid in pairs
-        ]
-        all_staff = ProjectStaff.query.filter(or_(*pair_filters)).all() if pair_filters else []
-        staff_map = {(s.employee_id, s.project_id): s for s in all_staff}
-        for entry in hour_entries:
-            entry._prefetched_project_staff = staff_map.get((entry.employee_id, entry.project_id))
-
-        # Compute project-level aggregates in Python from already-loaded entries
-        project_revenue = sum(
-            e.hours_billed * (e.employee.hourly_rate or 0) for e in hour_entries
-        )
-        associate_emp_ids = {
-            e.employee_id for e in hour_entries if e.employee.role.lower() == 'associate'
-        }
-        associate_revenue = sum(
-            e.hours_billed * (e.employee.hourly_rate or 0)
-            for e in hour_entries if e.employee_id in associate_emp_ids
-        )
-        for entry in hour_entries:
-            staff = entry._prefetched_project_staff
-            if not staff or not entry.employee:
-                entry._prefetched_commission_earned = 0.0
-                continue
-            commission_pct = (staff.commission_percentage or 0) / 100
-            hourly_rate = entry.employee.hourly_rate or 0
-            role = entry.employee.role.lower()
-            if role == 'associate':
-                comm = entry.hours_worked * hourly_rate * commission_pct
-            elif role == 'director':
-                comm = entry.hours_worked * hourly_rate * commission_pct
-                comm += (project_revenue * entry.employee.override_percentage / 100) if entry.employee.override_percentage else 0
-            else:
-                comm = associate_revenue * commission_pct
-            entry._prefetched_commission_earned = comm
-
     app.logger.debug(f"[Projects Detail] Retrieved {len(hour_entries)} hour entries for project id={project.id}")
 
     # Per-employee summary for Hours Summary table
@@ -576,7 +581,7 @@ def projects_detail(id):
                 'commission': 0.0,
             }
         emp_summary[eid]['hours_billed'] += entry.hours_billed or 0
-        emp_summary[eid]['revenue'] += entry.revenue_generated or 0
+        emp_summary[eid]['revenue'] += entry.revenue or 0
         emp_summary[eid]['commission'] += entry.commission_earned or 0
     hours_summary = sorted(emp_summary.values(), key=lambda x: x['name'])
 
@@ -830,56 +835,6 @@ def hours_list():
 
     hours = get_paginated_query(query, page, per_page)
 
-    # Pre-fetch ProjectStaff and pre-compute commission_earned to avoid N+1
-    if hours.items:
-        pairs = set((e.employee_id, e.project_id) for e in hours.items)
-        pair_filters = [
-            and_(ProjectStaff.employee_id == eid, ProjectStaff.project_id == pid)
-            for eid, pid in pairs
-        ]
-        all_staff = ProjectStaff.query.filter(or_(*pair_filters)).all() if pair_filters else []
-        staff_map = {(s.employee_id, s.project_id): s for s in all_staff}
-        for entry in hours.items:
-            entry._prefetched_project_staff = staff_map.get((entry.employee_id, entry.project_id))
-
-        # Batch aggregate project and associate revenue for all projects on this page
-        page_project_ids = list({e.project_id for e in hours.items})
-        proj_rev_rows = db.session.query(
-            HoursEntry.project_id,
-            func.coalesce(func.sum(HoursEntry.hours_billed * Employee.hourly_rate), 0)
-        ).join(Employee, HoursEntry.employee_id == Employee.id).filter(
-            HoursEntry.project_id.in_(page_project_ids)
-        ).group_by(HoursEntry.project_id).all()
-        proj_rev_map = {row[0]: row[1] for row in proj_rev_rows}
-
-        assoc_rev_rows = db.session.query(
-            HoursEntry.project_id,
-            func.coalesce(func.sum(HoursEntry.hours_billed * Employee.hourly_rate), 0)
-        ).join(Employee, HoursEntry.employee_id == Employee.id).filter(
-            HoursEntry.project_id.in_(page_project_ids),
-            Employee.role.ilike('associate')
-        ).group_by(HoursEntry.project_id).all()
-        assoc_rev_map = {row[0]: row[1] for row in assoc_rev_rows}
-
-        for entry in hours.items:
-            staff = staff_map.get((entry.employee_id, entry.project_id))
-            if not staff or not entry.employee:
-                entry._prefetched_commission_earned = 0.0
-                continue
-            commission_pct = (staff.commission_percentage or 0) / 100
-            hourly_rate = entry.employee.hourly_rate or 0
-            role = entry.employee.role.lower()
-            project_revenue = proj_rev_map.get(entry.project_id, 0)
-            associate_revenue = assoc_rev_map.get(entry.project_id, 0)
-            if role == 'associate':
-                comm = entry.hours_worked * hourly_rate * commission_pct
-            elif role == 'director':
-                comm = entry.hours_worked * hourly_rate * commission_pct
-                comm += (project_revenue * entry.employee.override_percentage / 100) if entry.employee.override_percentage else 0
-            else:
-                comm = associate_revenue * commission_pct
-            entry._prefetched_commission_earned = comm
-
     app.logger.debug(f"[Hours List] Retrieved {len(hours.items)} entries on page {page}")
     return render_template('hours/list.html', hours=hours, search=search, sort=sort, order=order)
 
@@ -891,14 +846,26 @@ def hours_new():
     form = HoursEntryForm()
     if form.validate_on_submit():
         app.logger.debug(f"[Hours New] Adding hours for employee_id={form.employee_id.data} on project_id={form.project_id.data}")
+        employee = Employee.query.get(form.employee_id.data)
+        project_staff = ProjectStaff.query.filter_by(
+            employee_id=form.employee_id.data,
+            project_id=form.project_id.data
+        ).first()
+        entry_revenue, entry_commission = (0.0, 0.0)
+        if employee and project_staff:
+            entry_revenue, entry_commission = _compute_entry_financials(
+                employee, project_staff, form.hours_billed.data, form.hours_billed.data, form.project_id.data
+            )
         hours_entry = HoursEntry(
             employee_id=form.employee_id.data,
             project_id=form.project_id.data,
             date=form.date.data,
-            hours_worked=form.hours_billed.data,  # same for now
+            hours_worked=form.hours_billed.data,
             hours_billed=form.hours_billed.data,
             description=form.description.data,
-            company_id=current_user.company_id
+            company_id=current_user.company_id,
+            revenue=entry_revenue,
+            commission_earned=entry_commission,
         )
         db.session.add(hours_entry)
         db.session.commit()
@@ -920,6 +887,18 @@ def hours_edit(id):
     if form.validate_on_submit():
         app.logger.debug(f"[Hours Edit] Updating hours entry id={hours_entry.id}")
         form.populate_obj(hours_entry)
+        # Recompute stored financials since hours_billed/hours_worked may have changed
+        employee = Employee.query.get(hours_entry.employee_id)
+        project_staff = ProjectStaff.query.filter_by(
+            employee_id=hours_entry.employee_id,
+            project_id=hours_entry.project_id
+        ).first()
+        if employee and project_staff:
+            hours_entry.revenue, hours_entry.commission_earned = _compute_entry_financials(
+                employee, project_staff,
+                hours_entry.hours_billed, hours_entry.hours_worked,
+                hours_entry.project_id, exclude_entry_id=hours_entry.id
+            )
         db.session.commit()
         app.logger.info(f"[Hours Edit] Hours entry id={hours_entry.id} updated successfully")
         flash('Hours entry updated successfully!', 'success')
@@ -1260,7 +1239,8 @@ def hours_import():
             if not proj:
                 errors.append(f'Row {i}: Project "{proj_name}" not found.')
                 continue
-            if not ProjectStaff.query.filter_by(employee_id=emp.id, project_id=proj.id).first():
+            project_staff = ProjectStaff.query.filter_by(employee_id=emp.id, project_id=proj.id).first()
+            if not project_staff:
                 errors.append(f'Row {i}: Employee "{emp_name}" is not assigned to project "{proj_name}".')
                 continue
             try:
@@ -1269,11 +1249,16 @@ def hours_import():
                 else:
                     entry_date = date_val
                 billed = float(hours_billed or 0)
+                entry_revenue, entry_commission = _compute_entry_financials(
+                    emp, project_staff, billed, billed, proj.id
+                )
                 db.session.add(HoursEntry(
                     employee_id=emp.id, project_id=proj.id,
                     date=entry_date, hours_worked=billed, hours_billed=billed,
                     description=str(description or '').strip(),
                     company_id=current_user.company_id,
+                    revenue=entry_revenue,
+                    commission_earned=entry_commission,
                 ))
                 created += 1
             except Exception as e:
@@ -1325,10 +1310,15 @@ def commission_export():
     ).all() if project_ids else []
 
     project_emp_hours = {}
+    project_emp_revenue = {}
     for entry in all_project_hours:
         project_emp_hours.setdefault(entry.project_id, {})
         project_emp_hours[entry.project_id][entry.employee_id] = (
             project_emp_hours[entry.project_id].get(entry.employee_id, 0) + entry.hours_worked
+        )
+        project_emp_revenue.setdefault(entry.project_id, {})
+        project_emp_revenue[entry.project_id][entry.employee_id] = (
+            project_emp_revenue[entry.project_id].get(entry.employee_id, 0) + (entry.revenue or 0)
         )
 
     wb = Workbook()
@@ -1343,13 +1333,12 @@ def commission_export():
         if not staff:
             continue
         emp_hours_map = project_emp_hours.get(project.id, {})
+        emp_revenue_map = project_emp_revenue.get(project.id, {})
         hours = emp_hours_map.get(employee_id, 0)
-        revenue = hours * (staff.hourly_rate or 0)
-        total_project_revenue = sum(
-            emp_hours_map.get(eid, 0) * (ps.hourly_rate or 0) for eid, ps in staff_map.items()
-        )
+        revenue = emp_revenue_map.get(employee_id, 0)
+        total_project_revenue = sum(emp_revenue_map.values())
         total_assoc_revenue = sum(
-            emp_hours_map.get(eid, 0) * (ps.hourly_rate or 0)
+            emp_revenue_map.get(eid, 0)
             for eid, ps in staff_map.items()
             if ps.employee and ps.employee.role.lower() == 'associate'
         )
@@ -1418,13 +1407,12 @@ def dashboard_export():
         emp_hours, emp_revenue = {}, {}
         total_project_revenue = 0
         for entry in hours_entries:
-            staff = staff_map.get(entry.employee_id)
-            if not staff:
+            if not staff_map.get(entry.employee_id):
                 continue
             emp_hours[entry.employee_id] = emp_hours.get(entry.employee_id, 0) + entry.hours_worked
-            revenue = entry.hours_worked * (staff.hourly_rate or 0)
-            emp_revenue[entry.employee_id] = emp_revenue.get(entry.employee_id, 0) + revenue
-            total_project_revenue += revenue
+            entry_rev = entry.revenue or 0
+            emp_revenue[entry.employee_id] = emp_revenue.get(entry.employee_id, 0) + entry_rev
+            total_project_revenue += entry_rev
         total_assoc_revenue = sum(
             emp_revenue.get(emp_id, 0) for emp_id, s in staff_map.items()
             if s.employee and s.employee.role.lower() == 'associate'

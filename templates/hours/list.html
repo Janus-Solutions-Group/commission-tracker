@@ -72,9 +72,9 @@
                                 </span>
                             </td>
                             <td class="text-end">
-                                <strong class="text-success">${{ "%.2f"|format(entry.commission_earned) }}</strong>
+                                <strong class="text-success">${{ "%.2f"|format(entry.commission_earned or 0) }}</strong>
                             </td>
-                            <td class="text-end">${{ "%.2f"|format(entry.revenue_generated) }}</td>
+                            <td class="text-end">${{ "%.2f"|format(entry.revenue or 0) }}</td>
                             <td class="text-center">
                                 <div class="btn-group btn-group-sm">
                                     <a href="{{ url_for('hours_edit', id=entry.id) }}" class="btn btn-outline-secondary">
