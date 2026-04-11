@@ -194,11 +194,11 @@ function openProjectDrawer(btn) {
     document.getElementById('drawerEmployeeRole').textContent = role;
 
     var content = document.getElementById('drawerContent');
-    var filtered = (byProject || []).filter(function(p) { return p.commission !== 0; });
-    if (filtered.length === 0) {
-        content.innerHTML = '<p class="text-muted">No commission-earning projects found.</p>';
+    var allProjects = byProject || [];
+    if (allProjects.length === 0) {
+        content.innerHTML = '<p class="text-muted">No project assignments found.</p>';
     } else {
-        byProject = filtered;
+        byProject = allProjects;
         var totalHours = 0, totalRevenue = 0, totalCommission = 0;
         var rows = byProject.map(function(p) {
             totalHours += p.hours;
