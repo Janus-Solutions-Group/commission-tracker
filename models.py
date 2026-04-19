@@ -95,9 +95,12 @@ class Employee(db.Model):
     
     @property
     def total_commission(self):
-        return db.session.query(
-            func.coalesce(func.sum(HoursEntry.commission_earned), 0)
-        ).filter_by(employee_id=self.id).scalar() or 0
+        if self.role.lower() == 'associate':
+            return db.session.query(
+                func.coalesce(func.sum(HoursEntry.commission_earned), 0)
+            ).filter_by(employee_id=self.id).scalar() or 0
+        records = StaffCommissionRecord.query.filter_by(employee_id=self.id).all()
+        return sum(r.direct_commission + r.override_commission for r in records)
 
     @property
     def total_revenue(self):
@@ -176,3 +179,29 @@ class HoursEntry(db.Model):
 
     def __repr__(self):
         return f'<HoursEntry {self.id} - {self.date}>'
+
+
+class StaffCommissionRecord(db.Model):
+    """Aggregate commission snapshot for non-associate staff per project.
+    Updated whenever any HoursEntry in the project is created, edited, or deleted."""
+    __tablename__ = 'staff_commission_record'
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
+    company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
+    revenue = db.Column(db.Float, nullable=False, default=0.0)
+    direct_commission = db.Column(db.Float, nullable=False, default=0.0)
+    override_commission = db.Column(db.Float, nullable=False, default=0.0)
+    commission_pct = db.Column(db.Float, nullable=False, default=0.0)   # fraction e.g. 0.10 for 10%
+    override_pct = db.Column(db.Float, nullable=False, default=0.0)     # fraction e.g. 0.02 for 2%
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    employee = db.relationship('Employee', foreign_keys=[employee_id])
+    project = db.relationship('Project', foreign_keys=[project_id])
+
+    __table_args__ = (
+        db.UniqueConstraint('employee_id', 'project_id', name='uq_staff_commission_emp_proj'),
+    )
+
+    def __repr__(self):
+        return f'<StaffCommissionRecord emp={self.employee_id} proj={self.project_id}>'

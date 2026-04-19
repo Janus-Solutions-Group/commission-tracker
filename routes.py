@@ -4,7 +4,7 @@ from flask import render_template, request, redirect, url_for, flash, jsonify, s
 from flask_login import login_user, logout_user, current_user, login_required
 from urllib.parse import urlparse
 from app import app, db
-from models import Project, Employee, ProjectStaff, HoursEntry, User, Company
+from models import Project, Employee, ProjectStaff, HoursEntry, User, Company, StaffCommissionRecord
 from forms import ProjectForm, EmployeeForm, ProjectStaffForm, HoursEntryForm, SignupForm, LoginForm, CommissionReportForm, DateRangeForm
 from utils import get_paginated_query, is_admin_email
 from sqlalchemy.orm import joinedload, subqueryload, contains_eager
@@ -12,6 +12,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_, func, and_
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
+
+
+def _safe_redirect(next_url, fallback):
+    parsed = urlparse(next_url or '')
+    if next_url and not parsed.netloc and not parsed.scheme:
+        return redirect(next_url)
+    return redirect(fallback)
 
 
 def _compute_entry_financials(employee, project_staff, hours_billed, hours_worked, project_id, exclude_entry_id=None):
@@ -56,6 +63,73 @@ def _compute_entry_financials(employee, project_staff, hours_billed, hours_worke
         commission = total_assoc_revenue * commission_pct
 
     return revenue, commission
+
+
+def _refresh_staff_commissions(project_id):
+    """Recompute and upsert StaffCommissionRecord for every non-associate on the project.
+    Must be called AFTER the triggering HoursEntry change is committed, so revenue
+    aggregates reflect the new state. Caller is responsible for the final commit."""
+    total_project_revenue = db.session.query(
+        func.coalesce(func.sum(HoursEntry.revenue), 0)
+    ).filter(HoursEntry.project_id == project_id).scalar() or 0.0
+
+    associate_ids = [
+        id_ for (id_,) in db.session.query(Employee.id).join(
+            ProjectStaff, ProjectStaff.employee_id == Employee.id
+        ).filter(
+            ProjectStaff.project_id == project_id,
+            Employee.role.ilike('associate')
+        ).all()
+    ]
+    total_assoc_revenue = db.session.query(
+        func.coalesce(func.sum(HoursEntry.revenue), 0)
+    ).filter(
+        HoursEntry.project_id == project_id,
+        HoursEntry.employee_id.in_(associate_ids)
+    ).scalar() or 0.0 if associate_ids else 0.0
+
+    non_assoc_staff = db.session.query(ProjectStaff).join(Employee).filter(
+        ProjectStaff.project_id == project_id,
+        ~Employee.role.ilike('associate')
+    ).all()
+
+    for staff in non_assoc_staff:
+        emp = staff.employee
+        role = emp.role.lower()
+        commission_pct = (staff.commission_percentage or 0) / 100
+
+        own_revenue = db.session.query(
+            func.coalesce(func.sum(HoursEntry.revenue), 0)
+        ).filter(
+            HoursEntry.project_id == project_id,
+            HoursEntry.employee_id == emp.id
+        ).scalar() or 0.0
+
+        stored_override_pct = (emp.override_percentage or 0) / 100
+
+        if role == 'director':
+            direct = own_revenue * commission_pct
+            override = total_project_revenue * stored_override_pct
+        else:
+            direct = total_assoc_revenue * commission_pct
+            override = 0.0
+
+        record = StaffCommissionRecord.query.filter_by(
+            employee_id=emp.id, project_id=project_id
+        ).first()
+        if not record:
+            record = StaffCommissionRecord(
+                employee_id=emp.id,
+                project_id=project_id,
+                company_id=staff.company_id,
+            )
+            db.session.add(record)
+        record.revenue = own_revenue
+        record.direct_commission = direct
+        record.override_commission = override
+        record.commission_pct = commission_pct
+        record.override_pct = stored_override_pct
+        record.updated_at = datetime.utcnow()
 
 
 def _make_excel_response(wb, filename):
@@ -199,6 +273,15 @@ def index():
 
         project_ids = [p.id for p in projects]
 
+        # Preload StaffCommissionRecord for non-associate commission lookups
+        scr_map = {
+            (rec.project_id, rec.employee_id): rec
+            for rec in StaffCommissionRecord.query.filter(
+                StaffCommissionRecord.project_id.in_(project_ids),
+                StaffCommissionRecord.employee_id == employee_id
+            ).all()
+        } if project_ids else {}
+
         # Single query for all hours across all relevant projects in date range
         all_project_hours = HoursEntry.query.filter(
             HoursEntry.project_id.in_(project_ids),
@@ -251,7 +334,9 @@ def index():
                 if ps.employee and ps.employee.role.lower() == 'associate'
             )
 
-            # Commission calculation with correct display hours/revenue per role
+            # Commission calculation — associates use per-entry stored values;
+            # non-associates use stored rates from StaffCommissionRecord applied to
+            # the date-range-filtered revenues so the period filter is respected.
             role = emp.role.lower()
             if role == 'associate':
                 direct_comm = revenue * (staff.commission_percentage or 0) / 100
@@ -260,13 +345,15 @@ def index():
                 display_revenue = revenue
                 note = "Associate: own hours commission"
             elif role == 'director':
-                direct_comm = revenue * (staff.commission_percentage or 0) / 100
-                override_comm = (total_project_revenue * employee.override_percentage / 100) if employee.override_percentage else 0
+                scr = scr_map.get((project.id, employee_id))
+                direct_comm = revenue * (scr.commission_pct if scr else 0)
+                override_comm = total_project_revenue * (scr.override_pct if scr else 0)
                 display_hours = sum(emp_hours_map.get(eid, 0) for eid in staff_map)
                 display_revenue = total_project_revenue
                 note = "Director: direct + 2% override"
             else:
-                direct_comm = total_assoc_revenue * (staff.commission_percentage or 0) / 100
+                scr = scr_map.get((project.id, employee_id))
+                direct_comm = total_assoc_revenue * (scr.commission_pct if scr else 0)
                 override_comm = 0
                 display_hours = total_assoc_hours
                 display_revenue = total_assoc_revenue
@@ -332,6 +419,14 @@ def dashboard():
 
     project_ids = [p.id for p in projects]
 
+    # Preload StaffCommissionRecord for non-associate commission lookups
+    scr_map = {
+        (rec.project_id, rec.employee_id): rec
+        for rec in StaffCommissionRecord.query.filter(
+            StaffCommissionRecord.project_id.in_(project_ids)
+        ).all()
+    } if project_ids else {}
+
     hours_query = HoursEntry.query.filter(HoursEntry.project_id.in_(project_ids)) if project_ids else HoursEntry.query.filter(False)
     if date_from:
         hours_query = hours_query.filter(HoursEntry.date >= date_from)
@@ -394,12 +489,14 @@ def dashboard():
                 display_hours = hours
                 display_revenue = revenue
             elif role == 'director':
-                direct_comm = revenue * (staff.commission_percentage or 0) / 100
-                override_comm = (total_project_revenue * employee.override_percentage / 100) if employee.override_percentage else 0
+                scr = scr_map.get((project.id, emp_id))
+                direct_comm = revenue * (scr.commission_pct if scr else 0)
+                override_comm = total_project_revenue * (scr.override_pct if scr else 0)
                 display_hours = total_project_hours
                 display_revenue = total_project_revenue
             else:
-                direct_comm = total_assoc_revenue * (staff.commission_percentage or 0) / 100
+                scr = scr_map.get((project.id, emp_id))
+                direct_comm = total_assoc_revenue * (scr.commission_pct if scr else 0)
                 override_comm = 0
                 display_hours = total_assoc_hours
                 display_revenue = total_assoc_revenue
@@ -509,6 +606,7 @@ def projects_list():
 @login_required
 def projects_new():
     app.logger.info(f"[Projects New] Request method={request.method}")
+    next_url = request.form.get('next') or request.args.get('next') or ''
     form = ProjectForm()
     if form.validate_on_submit():
         app.logger.debug(f"[Projects New] Creating project '{form.name.data}' for company_id={current_user.company_id}")
@@ -526,14 +624,15 @@ def projects_new():
         db.session.commit()
         app.logger.info(f"[Projects New] Project '{project.name}' created successfully with id={project.id}")
         flash('Project created successfully!', 'success')
-        return redirect(url_for('projects_list'))
-    return render_template('projects/form.html', form=form, title='New Project')
+        return _safe_redirect(next_url, url_for('projects_list'))
+    return render_template('projects/form.html', form=form, title='New Project', next_url=next_url)
 
 
 @app.route('/projects/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def projects_edit(id):
     app.logger.info(f"[Projects Edit] Editing project id={id} for company_id={current_user.company_id}")
+    next_url = request.form.get('next') or request.args.get('next') or ''
     project = Project.query.filter_by(id=id, company_id=current_user.company_id).first_or_404()
     form = ProjectForm(obj=project)
     if form.validate_on_submit():
@@ -542,8 +641,8 @@ def projects_edit(id):
         db.session.commit()
         app.logger.info(f"[Projects Edit] Project id={project.id} updated successfully")
         flash('Project updated successfully!', 'success')
-        return redirect(url_for('projects_list'))
-    return render_template('projects/form.html', form=form, title='Edit Project', project=project)
+        return _safe_redirect(next_url, url_for('projects_list'))
+    return render_template('projects/form.html', form=form, title='Edit Project', project=project, next_url=next_url)
 
 
 @app.route('/projects/<int:id>/delete', methods=['POST'])
@@ -586,7 +685,28 @@ def projects_detail(id):
             }
         emp_summary[eid]['hours_billed'] += entry.hours_billed or 0
         emp_summary[eid]['revenue'] += entry.revenue or 0
-        emp_summary[eid]['commission'] += entry.commission_earned or 0
+        # Associates use per-entry stored commission; non-associates are overridden below
+        if entry.employee.role.lower() == 'associate':
+            emp_summary[eid]['commission'] += entry.commission_earned or 0
+
+    # Override commission for non-associates from their authoritative StaffCommissionRecord
+    commission_records = StaffCommissionRecord.query.options(
+        joinedload(StaffCommissionRecord.employee)
+    ).filter_by(project_id=project.id).all()
+    for rec in commission_records:
+        total_comm = rec.direct_commission + rec.override_commission
+        if rec.employee_id in emp_summary:
+            emp_summary[rec.employee_id]['commission'] = total_comm
+        else:
+            # Non-associate with a commission record but no direct hours entries
+            emp_summary[rec.employee_id] = {
+                'name': rec.employee.name,
+                'role': rec.employee.role,
+                'hours_billed': 0.0,
+                'revenue': rec.revenue,
+                'commission': total_comm,
+            }
+
     hours_summary = sorted(emp_summary.values(), key=lambda x: x['name'])
 
     return render_template('projects/detail.html', project=project, hour_entries=hour_entries, hours_summary=hours_summary)
@@ -644,6 +764,7 @@ def employees_list():
 @login_required
 def employees_new():
     app.logger.info(f"[Employees New] Request method={request.method}")
+    next_url = request.form.get('next') or request.args.get('next') or ''
     form = EmployeeForm()
     if form.validate_on_submit():
         app.logger.debug(f"[Employees New] Creating employee '{form.name.data}' for company_id={current_user.company_id}")
@@ -658,14 +779,15 @@ def employees_new():
         db.session.commit()
         app.logger.info(f"[Employees New] Employee '{employee.name}' created successfully with id={employee.id}")
         flash('Employee created successfully!', 'success')
-        return redirect(url_for('employees_list'))
-    return render_template('employees/form.html', form=form, title='New Employee')
+        return _safe_redirect(next_url, url_for('employees_list'))
+    return render_template('employees/form.html', form=form, title='New Employee', next_url=next_url)
 
 
 @app.route('/employees/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def employees_edit(id):
     app.logger.info(f"[Employees Edit] Editing employee id={id} for company_id={current_user.company_id}")
+    next_url = request.form.get('next') or request.args.get('next') or ''
     employee = Employee.query.filter_by(id=id, company_id=current_user.company_id).first_or_404()
     form = EmployeeForm(obj=employee)
     if form.validate_on_submit():
@@ -678,8 +800,8 @@ def employees_edit(id):
         db.session.commit()
         app.logger.info(f"[Employees Edit] Employee id={employee.id} updated successfully")
         flash('Employee updated successfully!', 'success')
-        return redirect(url_for('employees_list'))
-    return render_template('employees/form.html', form=form, title='Edit Employee', employee=employee)
+        return _safe_redirect(next_url, url_for('employees_list'))
+    return render_template('employees/form.html', form=form, title='Edit Employee', employee=employee, next_url=next_url)
 
 
 @app.route('/employees/<int:id>/delete', methods=['POST'])
@@ -741,6 +863,7 @@ def project_staff_list():
 @login_required
 def project_staff_new():
     app.logger.info(f"[ProjectStaff New] Request method={request.method}")
+    next_url = request.form.get('next') or request.args.get('next') or ''
     form = ProjectStaffForm()
     if form.validate_on_submit():
         try:
@@ -756,20 +879,21 @@ def project_staff_new():
             db.session.commit()
             app.logger.info(f"[ProjectStaff New] Assignment created with id={project_staff.id}")
             flash('Employee assigned to project successfully!', 'success')
-            return redirect(url_for('project_staff_list'))
+            return _safe_redirect(next_url, url_for('project_staff_list'))
         except IntegrityError as e:
             db.session.rollback()
             app.logger.warning(f"[ProjectStaff New] IntegrityError: {str(e)}")
             flash('This employee is already assigned to the selected project.', 'error')
-    return render_template('project_staff/form.html', form=form, title='Assign Employee to Project')
+    return render_template('project_staff/form.html', form=form, title='Assign Employee to Project', next_url=next_url)
 
 
 @app.route('/project-staff/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def project_staff_edit(id):
     app.logger.info(f"[ProjectStaff Edit] Editing assignment id={id} for company_id={current_user.company_id}")
+    next_url = request.form.get('next') or request.args.get('next') or ''
     project_staff = ProjectStaff.query.join(Project).filter(
-        ProjectStaff.id == id, 
+        ProjectStaff.id == id,
         Project.company_id == current_user.company_id
     ).first_or_404()
     form = ProjectStaffForm(obj=project_staff)
@@ -780,12 +904,12 @@ def project_staff_edit(id):
             db.session.commit()
             app.logger.info(f"[ProjectStaff Edit] Assignment id={project_staff.id} updated successfully")
             flash('Project assignment updated successfully!', 'success')
-            return redirect(url_for('project_staff_list'))
+            return _safe_redirect(next_url, url_for('project_staff_list'))
         except IntegrityError as e:
             db.session.rollback()
             app.logger.warning(f"[ProjectStaff New] IntegrityError: {str(e)}")
             flash('This employee is already assigned to the selected project.', 'error')
-    return render_template('project_staff/form.html', form=form, title='Edit Project Assignment', project_staff=project_staff)
+    return render_template('project_staff/form.html', form=form, title='Edit Project Assignment', project_staff=project_staff, next_url=next_url)
 
 
 @app.route('/project-staff/<int:id>/delete', methods=['POST'])
@@ -846,6 +970,7 @@ def hours_list():
 @login_required
 def hours_new():
     app.logger.info(f"[Hours New] Request method={request.method}")
+    next_url = request.form.get('next') or request.args.get('next') or ''
     form = HoursEntryForm()
     if form.validate_on_submit():
         app.logger.debug(f"[Hours New] Adding hours for employee_id={form.employee_id.data} on project_id={form.project_id.data}")
@@ -872,25 +997,27 @@ def hours_new():
         )
         db.session.add(hours_entry)
         db.session.commit()
+        _refresh_staff_commissions(hours_entry.project_id)
+        db.session.commit()
         app.logger.info(f"[Hours New] Hours entry created with id={hours_entry.id}")
         flash('Hours entry created successfully!', 'success')
-        return redirect(url_for('hours_list'))
-    return render_template('hours/form.html', form=form, title='New Hours Entry')
+        return _safe_redirect(next_url, url_for('hours_list'))
+    return render_template('hours/form.html', form=form, title='New Hours Entry', next_url=next_url)
 
 
 @app.route('/hours/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def hours_edit(id):
     app.logger.info(f"[Hours Edit] Editing hours entry id={id} for company_id={current_user.company_id}")
+    next_url = request.form.get('next') or request.args.get('next') or ''
     hours_entry = HoursEntry.query.join(Project).filter(
-        HoursEntry.id == id, 
+        HoursEntry.id == id,
         Project.company_id == current_user.company_id
     ).first_or_404()
     form = HoursEntryForm(obj=hours_entry)
     if form.validate_on_submit():
         app.logger.debug(f"[Hours Edit] Updating hours entry id={hours_entry.id}")
         form.populate_obj(hours_entry)
-        # Recompute stored financials since hours_billed/hours_worked may have changed
         employee = Employee.query.get(hours_entry.employee_id)
         project_staff = ProjectStaff.query.filter_by(
             employee_id=hours_entry.employee_id,
@@ -903,10 +1030,12 @@ def hours_edit(id):
                 hours_entry.project_id, exclude_entry_id=hours_entry.id
             )
         db.session.commit()
+        _refresh_staff_commissions(hours_entry.project_id)
+        db.session.commit()
         app.logger.info(f"[Hours Edit] Hours entry id={hours_entry.id} updated successfully")
         flash('Hours entry updated successfully!', 'success')
-        return redirect(url_for('hours_list'))
-    return render_template('hours/form.html', form=form, title='Edit Hours Entry', hours_entry=hours_entry)
+        return _safe_redirect(next_url, url_for('hours_list'))
+    return render_template('hours/form.html', form=form, title='Edit Hours Entry', hours_entry=hours_entry, next_url=next_url)
 
 
 @app.route('/hours/<int:id>/delete', methods=['POST'])
@@ -915,17 +1044,20 @@ def hours_delete(id):
     redirect_back = request.args.get("redirect", "0") == "1"
     app.logger.info(f"[Hours Delete] Deleting hours entry id={id} for company_id={current_user.company_id}")
     hours_entry = HoursEntry.query.join(Project).filter(
-        HoursEntry.id == id, 
+        HoursEntry.id == id,
         Project.company_id == current_user.company_id
     ).first_or_404()
+    project_id = hours_entry.project_id
     db.session.delete(hours_entry)
+    db.session.commit()
+    _refresh_staff_commissions(project_id)
     db.session.commit()
     app.logger.info(f"[Hours Delete] Hours entry id={id} deleted successfully")
     flash('Hours entry deleted successfully!', 'success')
     if redirect_back:
         return redirect(url_for('hours_list'))
     else:
-        return redirect(url_for('projects_detail', id=hours_entry.project_id))
+        return redirect(url_for('projects_detail', id=project_id))
     
 # Error handlers
 @app.errorhandler(404)
@@ -1227,6 +1359,7 @@ def hours_import():
         ws = wb.active
         rows = list(ws.iter_rows(min_row=2, values_only=True))
         created, errors = 0, []
+        affected_project_ids = set()
         for i, row in enumerate(rows, start=2):
             row = list(row) + [None] * 5
             emp_name, proj_name, date_val, hours_billed, description = row[:5]
@@ -1262,10 +1395,15 @@ def hours_import():
                     revenue=entry_revenue,
                     commission_earned=entry_commission,
                 ))
+                affected_project_ids.add(proj.id)
                 created += 1
             except Exception as e:
                 errors.append(f'Row {i}: {e}')
         db.session.commit()
+        for pid in affected_project_ids:
+            _refresh_staff_commissions(pid)
+        if affected_project_ids:
+            db.session.commit()
         if created:
             flash(f'Imported {created} hours entry(s) successfully.', 'success')
         for err in errors[:5]:
@@ -1306,6 +1444,15 @@ def commission_export():
     ).all()
 
     project_ids = [p.id for p in projects]
+
+    scr_map = {
+        (rec.project_id, rec.employee_id): rec
+        for rec in StaffCommissionRecord.query.filter(
+            StaffCommissionRecord.project_id.in_(project_ids),
+            StaffCommissionRecord.employee_id == employee_id
+        ).all()
+    } if project_ids else {}
+
     all_project_hours = HoursEntry.query.filter(
         HoursEntry.project_id.in_(project_ids),
         HoursEntry.date >= date_from, HoursEntry.date <= date_to
@@ -1350,11 +1497,13 @@ def commission_export():
             override_comm = 0
             display_hours = hours
         elif role == 'director':
-            direct_comm = revenue * (staff.commission_percentage or 0) / 100
-            override_comm = (total_project_revenue * employee.override_percentage / 100) if employee.override_percentage else 0
+            scr = scr_map.get((project.id, employee_id))
+            direct_comm = revenue * (scr.commission_pct if scr else 0)
+            override_comm = total_project_revenue * (scr.override_pct if scr else 0)
             display_hours = sum(emp_hours_map.get(eid, 0) for eid in staff_map)
         else:
-            direct_comm = total_assoc_revenue * (staff.commission_percentage or 0) / 100
+            scr = scr_map.get((project.id, employee_id))
+            direct_comm = total_assoc_revenue * (scr.commission_pct if scr else 0)
             override_comm = 0
             display_hours = sum(
                 emp_hours_map.get(eid, 0) for eid, ps in staff_map.items()
@@ -1391,6 +1540,14 @@ def dashboard_export():
     ).filter_by(company_id=current_user.company_id).all()
 
     project_ids = [p.id for p in projects]
+
+    scr_map = {
+        (rec.project_id, rec.employee_id): rec
+        for rec in StaffCommissionRecord.query.filter(
+            StaffCommissionRecord.project_id.in_(project_ids)
+        ).all()
+    } if project_ids else {}
+
     hours_query = HoursEntry.query.filter(HoursEntry.project_id.in_(project_ids)) if project_ids else HoursEntry.query.filter(False)
     if date_from:
         hours_query = hours_query.filter(HoursEntry.date >= date_from)
@@ -1429,11 +1586,13 @@ def dashboard_export():
                 commission = revenue * (staff.commission_percentage or 0) / 100
                 display_hours, display_revenue = hours, revenue
             elif role == 'director':
-                commission = (revenue * (staff.commission_percentage or 0) / 100 +
-                              ((total_project_revenue * emp.override_percentage / 100) if emp.override_percentage else 0))
+                scr = scr_map.get((project.id, emp_id))
+                commission = (revenue * (scr.commission_pct if scr else 0) +
+                              total_project_revenue * (scr.override_pct if scr else 0))
                 display_hours, display_revenue = total_project_hours, total_project_revenue
             else:
-                commission = total_assoc_revenue * (staff.commission_percentage or 0) / 100
+                scr = scr_map.get((project.id, emp_id))
+                commission = total_assoc_revenue * (scr.commission_pct if scr else 0)
                 display_hours = sum(emp_hours.get(eid, 0) for eid, s in staff_map.items() if s.employee and s.employee.role.lower() == 'associate')
                 display_revenue = total_assoc_revenue
             if emp_id not in employee_summary:
