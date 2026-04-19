@@ -77,7 +77,7 @@
                                     <a href="{{ url_for('projects_detail', id=project.id) }}" class="btn btn-outline-primary">
                                         <i data-feather="eye"></i>
                                     </a>
-                                    <a href="{{ url_for('projects_edit', id=project.id) }}" class="btn btn-outline-secondary">
+                                    <a href="{{ url_for('projects_edit', id=project.id, next=request.full_path) }}" class="btn btn-outline-secondary">
                                         <i data-feather="edit-2"></i>
                                     </a>
                                     <form method="POST" action="{{ url_for('projects_delete', id=project.id) }}" class="d-inline"

@@ -355,14 +355,18 @@ def dashboard():
         emp_hours = {}
         emp_revenue = {}
         total_project_revenue = 0
-
+        total_comm = 0
+        emp_comm = {}
         for entry in hours_entries:
             if not staff_map.get(entry.employee_id):
                 continue
             emp_hours[entry.employee_id] = emp_hours.get(entry.employee_id, 0) + entry.hours_worked
             entry_rev = entry.revenue or 0
+            entry_comm = entry.commission_earned or 0
             emp_revenue[entry.employee_id] = emp_revenue.get(entry.employee_id, 0) + entry_rev
+            emp_comm[entry.employee_id] = emp_comm.get(entry.employee_id, 0) + entry_comm
             total_project_revenue += entry_rev
+            total_comm += entry_comm
 
         # Associate-specific aggregates for non-associate commission basis
         total_assoc_hours = sum(
@@ -643,7 +647,6 @@ def employees_new():
     form = EmployeeForm()
     if form.validate_on_submit():
         app.logger.debug(f"[Employees New] Creating employee '{form.name.data}' for company_id={current_user.company_id}")
-        print(form.role.data,form.override_percentage.data, form.override_percentage.data if form.role.data == 'Director' else 0.0, "override_percentage")
         employee = Employee(
             name=form.name.data,
             role=form.role.data,
@@ -910,7 +913,6 @@ def hours_edit(id):
 @login_required
 def hours_delete(id):
     redirect_back = request.args.get("redirect", "0") == "1"
-    print(redirect_back)
     app.logger.info(f"[Hours Delete] Deleting hours entry id={id} for company_id={current_user.company_id}")
     hours_entry = HoursEntry.query.join(Project).filter(
         HoursEntry.id == id, 

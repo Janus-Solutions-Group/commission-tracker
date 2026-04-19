@@ -2,7 +2,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, FloatField, DateField, TextAreaField, SelectField, SubmitField, PasswordField, BooleanField
 from wtforms.validators import DataRequired, NumberRange, Length, ValidationError, Email, EqualTo, Optional
 from models import Employee, Project, ProjectStaff, User, Company
-from datetime import date
+from datetime import date, timedelta
 
 class SignupForm(FlaskForm):
     name = StringField('Name', validators=[DataRequired(), Length(min=4, max=20)])
@@ -125,8 +125,8 @@ class HoursEntryForm(FlaskForm):
 
 class CommissionReportForm(FlaskForm):
     employee_id = SelectField('Employee', coerce=int, validators=[DataRequired()])
-    date_from = DateField('Date From', validators=[DataRequired()])
-    date_to = DateField('Date To', validators=[DataRequired()])
+    date_from = DateField('Date From', validators=[DataRequired()], default=lambda: date.today() - timedelta(days=7))
+    date_to = DateField('Date To', validators=[DataRequired()], default=date.today)
     submit = SubmitField('Generate Report')
 
     def set_employee_choices(self, company_id):
@@ -138,6 +138,6 @@ class CommissionReportForm(FlaskForm):
         ]
 
 class DateRangeForm(FlaskForm):
-    date_from = DateField("From", validators=[DataRequired()])
-    date_to = DateField("To", validators=[DataRequired()])
+    date_from = DateField("From", validators=[DataRequired()], default=lambda: date.today() - timedelta(days=7))
+    date_to = DateField("To", validators=[DataRequired()], default=date.today)
     submit = SubmitField("Filter")

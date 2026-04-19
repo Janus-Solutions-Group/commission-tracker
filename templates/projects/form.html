@@ -15,6 +15,7 @@
             <div class="card-body">
                 <form method="POST">
                     {{ form.hidden_tag() }}
+                    <input type="hidden" name="next" value="{{ next_url or '' }}">
                     
                     <div class="row">
                         <div class="col-md-4">
@@ -116,7 +117,7 @@
 
 
                     <div class="d-flex justify-content-between">
-                        <a href="{{ url_for('projects_list') }}" class="btn btn-secondary">
+                        <a href="{{ next_url or url_for('projects_list') }}" class="btn btn-secondary">
                             <i data-feather="arrow-left"></i> Back to Projects
                         </a>
                         <button type="submit" class="btn btn-primary">

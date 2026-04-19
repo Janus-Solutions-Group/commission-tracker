@@ -60,7 +60,9 @@
                 </a>
             </div>
             <div class="card-body">
-            {% if report_data %}
+            {% set ns_check = namespace(has_data=false) %}
+            {% for entry in report_data %}{% if entry.total_revenue != 0 or entry.total_commission != 0 %}{% set ns_check.has_data = true %}{% endif %}{% endfor %}
+            {% if ns_check.has_data %}
             <div class="mb-3">
                 <div class="row g-2 align-items-center">
                     <div class="col-md-5" style="position:relative;">
@@ -160,8 +162,9 @@
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
-    <div class="offcanvas-body p-0">
-        <div id="drawerContent" class="p-4"></div>
+    <div class="offcanvas-body p-0" style="overflow:hidden;display:flex;flex-direction:column;">
+        <div id="drawerContent" class="p-4" style="flex:1;overflow-y:auto;"></div>
+        <div id="drawerFooter" class="px-4 py-3 bg-light" style="display:none;flex-shrink:0;border-top:1px solid #dee2e6;"></div>
     </div>
 </div>
 
@@ -194,12 +197,15 @@ function openProjectDrawer(btn) {
     document.getElementById('drawerEmployeeRole').textContent = role;
 
     var content = document.getElementById('drawerContent');
+    var footer = document.getElementById('drawerFooter');
     var allProjects = byProject || [];
     if (allProjects.length === 0) {
         content.innerHTML = '<p class="text-muted">No project assignments found.</p>';
+        footer.style.display = 'none';
     } else {
         byProject = allProjects;
         var totalHours = 0, totalRevenue = 0, totalCommission = 0;
+        var colgroup = '<colgroup><col style="width:46%;"><col style="width:18%;"><col style="width:18%;"><col style="width:18%;"></colgroup>';
         var rows = byProject.map(function(p) {
             totalHours += p.hours;
             totalRevenue += p.revenue;
@@ -213,9 +219,9 @@ function openProjectDrawer(btn) {
         }).join('');
 
         content.innerHTML =
-            '<div class="table-responsive">' +
-            '<table class="table table-sm table-striped align-middle mb-0" style="font-size:0.875rem;">' +
-            '<thead class="table-dark">' +
+            '<table class="table table-sm table-striped align-middle mb-0" style="font-size:0.875rem;table-layout:fixed;width:100%;">' +
+            colgroup +
+            '<thead class="table-dark" style="position:sticky;top:0;z-index:1;">' +
                 '<tr>' +
                     '<th>Project</th>' +
                     '<th class="text-end">Hours</th>' +
@@ -224,15 +230,21 @@ function openProjectDrawer(btn) {
                 '</tr>' +
             '</thead>' +
             '<tbody>' + rows + '</tbody>' +
-            '<tfoot class="table-light fw-bold">' +
+            '</table>';
+
+        footer.innerHTML =
+            '<table class="table table-sm mb-0 fw-bold" style="font-size:0.875rem;table-layout:fixed;width:100%;">' +
+            colgroup +
+            '<tbody>' +
                 '<tr>' +
                     '<td>Total</td>' +
                     '<td class="text-end">' + totalHours.toFixed(2) + '</td>' +
                     '<td class="text-end">$' + totalRevenue.toFixed(2) + '</td>' +
                     '<td class="text-end text-success">$' + totalCommission.toFixed(2) + '</td>' +
                 '</tr>' +
-            '</tfoot>' +
-            '</table></div>';
+            '</tbody>' +
+            '</table>';
+        footer.style.display = '';
     }
 
     var drawer = bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('projectBreakdownDrawer'));

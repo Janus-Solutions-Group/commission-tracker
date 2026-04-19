@@ -73,7 +73,7 @@
                             <td class="text-end">{{ "%.2f"|format(employee.total_hours_worked) }}</td>
                             <td class="text-center">
                                 <div class="btn-group btn-group-sm">
-                                    <a href="{{ url_for('employees_edit', id=employee.id) }}" class="btn btn-outline-secondary">
+                                    <a href="{{ url_for('employees_edit', id=employee.id, next=request.full_path) }}" class="btn btn-outline-secondary">
                                         <i data-feather="edit-2"></i>
                                     </a>
                                     <form method="POST" action="{{ url_for('employees_delete', id=employee.id) }}" class="d-inline"
