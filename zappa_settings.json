@@ -1,12 +1,15 @@
 {
   "production": {
-    "app_function": "app.app", 
+    "app_function": "app.app",
     "aws_region": "us-east-1",
     "profile_name": "nexif_admin",
     "project_name": "commission-tracker",
     "runtime": "python3.9",
     "s3_bucket": "zappa-e869410f",
     "manage_roles": false,
-    "slim_handler": true
+    "slim_handler": true,
+    "environment_variables": {
+      "SCRIPT_NAME": "/production"
+    }
   }
 }

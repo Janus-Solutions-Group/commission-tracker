@@ -12,7 +12,7 @@
         <p class="text-muted">Project ID: <strong>{{ project.project_id }}</strong></p>
     </div>
     <div class="col-auto">
-        <a href="{{ url_for('projects_edit', id=project.id) }}" class="btn btn-primary">
+        <a href="{{ url_for('projects_edit', id=project.id, next=request.full_path) }}" class="btn btn-primary">
             <i data-feather="edit-2"></i> Edit Project
         </a>
         <a href="{{ url_for('projects_list') }}" class="btn btn-outline-secondary">
@@ -104,7 +104,7 @@
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i data-feather="clock"></i> Hours Summary</h5>
-                <a href="{{ url_for('hours_new') }}" class="btn btn-sm btn-primary">
+                <a href="{{ url_for('hours_new', next=request.full_path) }}" class="btn btn-sm btn-primary">
                     <i data-feather="plus"></i> Add Hours
                 </a>
             </div>
@@ -221,7 +221,7 @@
                             <td class="text-end text-primary">${{ "%.2f"|format(entry.commission_earned or 0) }}</td>
                             <td class="text-center">
                                 <div class="btn-group btn-group-sm">
-                                    <a href="{{ url_for('hours_edit', id=entry.id) }}" class="btn btn-outline-secondary">
+                                    <a href="{{ url_for('hours_edit', id=entry.id, next=request.full_path) }}" class="btn btn-outline-secondary">
                                         <i data-feather="edit-2"></i>
                                     </a>
                                     <form method="POST" action="{{ url_for('hours_delete', id=entry.id, redirect=0) }}" class="d-inline"
@@ -252,7 +252,7 @@
                 <i data-feather="clock" size="48" class="text-muted mb-3"></i>
                 <h5 class="text-muted">No hour entries yet</h5>
                 <p class="text-muted">Start tracking time by adding your first hour entry.</p>
-                <a href="{{ url_for('hours_new') }}" class="btn btn-primary">
+                <a href="{{ url_for('hours_new', next=request.full_path) }}" class="btn btn-primary">
                     <i data-feather="plus"></i> Add First Entry
                 </a>
             </div>
