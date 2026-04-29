@@ -1,12 +1,12 @@
 import io
 from datetime import datetime
-from flask import render_template, request, redirect, url_for, flash, jsonify, send_file
+from flask import render_template, request, redirect, flash, jsonify, send_file
 from flask_login import login_user, logout_user, current_user, login_required
 from urllib.parse import urlparse
 from app import app, db
 from models import Project, Employee, ProjectStaff, HoursEntry, User, Company, StaffCommissionRecord
 from forms import ProjectForm, EmployeeForm, ProjectStaffForm, HoursEntryForm, SignupForm, LoginForm, CommissionReportForm, DateRangeForm
-from utils import get_paginated_query, is_admin_email
+from utils import get_paginated_query, is_admin_email, url_for, prefixed_url
 from sqlalchemy.orm import joinedload, subqueryload, contains_eager
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_, func, and_
@@ -17,7 +17,7 @@ from openpyxl.styles import Font, PatternFill, Alignment
 def _safe_redirect(next_url, fallback):
     parsed = urlparse(next_url or '')
     if next_url and not parsed.netloc and not parsed.scheme:
-        return redirect(next_url)
+        return redirect(prefixed_url(next_url))
     return redirect(fallback)
 
 
@@ -621,7 +621,13 @@ def projects_new():
             company_id=current_user.company_id
         )
         db.session.add(project)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            app.logger.warning(f"[Projects New] Duplicate project_id='{form.project_id.data}'")
+            flash(f"A project with ID '{form.project_id.data}' already exists. Please use a different Project ID.", 'danger')
+            return render_template('projects/form.html', form=form, title='New Project', next_url=next_url)
         app.logger.info(f"[Projects New] Project '{project.name}' created successfully with id={project.id}")
         flash('Project created successfully!', 'success')
         return _safe_redirect(next_url, url_for('projects_list'))
@@ -776,7 +782,13 @@ def employees_new():
             company_id=current_user.company_id
         )
         db.session.add(employee)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            app.logger.warning(f"[Employees New] Duplicate employee name='{form.name.data}'")
+            flash(f"An employee named '{form.name.data}' already exists. Please check for duplicates.", 'danger')
+            return render_template('employees/form.html', form=form, title='New Employee', next_url=next_url)
         app.logger.info(f"[Employees New] Employee '{employee.name}' created successfully with id={employee.id}")
         flash('Employee created successfully!', 'success')
         return _safe_redirect(next_url, url_for('employees_list'))

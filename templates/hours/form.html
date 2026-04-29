@@ -90,7 +90,7 @@
                     </div>
 
                     <div class="d-flex justify-content-between">
-                        <a href="{{ next_url or url_for('hours_list') }}" class="btn btn-secondary">
+                        <a href="{{ prefixed_url(next_url) or url_for('hours_list') }}" class="btn btn-secondary">
                             <i data-feather="arrow-left"></i> Back to Hours
                         </a>
                         <button type="submit" class="btn btn-primary">

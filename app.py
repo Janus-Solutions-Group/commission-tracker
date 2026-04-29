@@ -19,12 +19,7 @@ db = SQLAlchemy(model_class=Base)
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET") or "dev-secret-change-in-production"
 app.config['JWT_SECRET_KEY'] = os.environ.get("SESSION_SECRET") or "dev-secret-change-in-production"
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_prefix=1)
-
-# Allow API Gateway stage prefix (e.g. /production) to be set via env var
-_script_name = os.environ.get("SCRIPT_NAME", "")
-if _script_name:
-    app.config["APPLICATION_ROOT"] = _script_name
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Initialize extensions
 login_manager = LoginManager()

@@ -78,7 +78,7 @@
 
 
                     <div class="d-flex justify-content-between">
-                        <a href="{{ next_url or url_for('employees_list') }}" class="btn btn-secondary">
+                        <a href="{{ prefixed_url(next_url) or url_for('employees_list') }}" class="btn btn-secondary">
                             <i data-feather="arrow-left"></i> Back to Employees
                         </a>
                         <button type="submit" class="btn btn-primary">
